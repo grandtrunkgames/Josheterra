@@ -1,7 +1,7 @@
 // Josheterra offline support.
 // App files are served from the cache straight away and refreshed in the background,
 // so the app opens instantly, works offline, and picks up updates on the next launch.
-const VERSION = 'josheterra-v1';
+const VERSION = 'josheterra-v2';
 const CORE = [
   './', 'index.html', 'map.html', 'flags.html', 'manifest.webmanifest',
   'icons/apple-touch-icon.png', 'icons/icon-192.png', 'icons/icon-512.png'

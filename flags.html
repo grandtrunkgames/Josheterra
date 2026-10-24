@@ -106,7 +106,14 @@ button:focus-visible,select:focus-visible,input:focus-visible,.flag:focus-visibl
 .missed{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:8px}
 .missed figure{margin:0;display:flex;align-items:center;gap:8px;font-size:13px;font-weight:700;min-width:0}
 .missed img{height:24px;width:auto;flex:none}
-@media (max-width:520px){.stats{gap:12px}.stat span{font-size:16px}.brand{font-size:19px}.flag{height:42px}.board{gap:12px 10px}.study .pic{height:70px}}
+@media (max-width:520px){.stats{gap:12px}.stat span{font-size:16px}.brand{font-size:19px}.study .pic{height:70px}}
+@media (max-width:600px){
+  .board{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px 10px;align-items:center;justify-items:center}
+  .flag{height:auto;width:auto;max-width:100%}
+  .flag img{width:auto;height:auto;max-width:100%;max-height:64px}
+  .study{grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+  .study .pic{height:60px}
+}
 @media (prefers-reduced-motion:reduce){.flag.reveal{animation:none;outline:5px solid var(--hit2)}.typer input.shake{animation:none}.bar i{transition:none}}
 </style>
 
