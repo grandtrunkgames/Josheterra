@@ -12,7 +12,7 @@
 <link rel="icon" href="icons/icon-192.png">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <style>
-html{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+html{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:calc(env(safe-area-inset-bottom,0px) * .4)}
 body{margin:0;font-family:system-ui,-apple-system,sans-serif;-webkit-text-size-adjust:100%;-webkit-tap-highlight-color:transparent}
 img{max-width:100%} [hidden]{display:none!important}
 .home{display:inline-flex;align-items:center;gap:4px;text-decoration:none;font-weight:700;color:inherit;border:1px solid var(--line);background:var(--panel);border-radius:8px;padding:7px 10px}
@@ -131,6 +131,36 @@ button:focus-visible,select:focus-visible,input:focus-visible,.flag:focus-visibl
   .study .pic{height:60px}
 }
 @media (prefers-reduced-motion:reduce){.flag.reveal{animation:none;outline:5px solid var(--hit2)}.typer input.shake{animation:none}.bar i{transition:none}}
+
+/* Phones: compact header so the play area gets most of the screen. */
+@media (max-width:600px){
+  .app{gap:6px;padding-block:4px 2px}
+  .top{gap:6px}
+  .brand{display:none}
+  .top select{flex:1 1 0;min-width:0;padding:6px 8px;font-size:15px}
+  .seg{flex-basis:100%;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+  .seg::-webkit-scrollbar{display:none}
+  .seg button{flex:1 0 auto;padding:6px 9px;font-size:14px}
+  .prompt{padding:6px 10px;gap:2px 10px;border-radius:10px}
+  .target{flex-basis:100%}
+  .target small{font-size:10.5px}
+  .target b{font-size:19px}
+  .stats{gap:12px;align-items:baseline}
+  .stat{display:flex;align-items:baseline;gap:4px}
+  .stat small{font-size:10px}
+  .stat span{font-size:14px}
+  .actions{margin-left:auto}
+  .actions .btn{padding:4px 10px;font-size:13px}
+  .hintline{padding:5px 8px;font-size:13.5px}
+  .bar{height:3px}
+  .stage{border-radius:10px}
+  .stage.match .inner{padding:6px}
+  .mgrid{gap:6px;grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+  .mcol{gap:5px;padding:2px 2px 40px}
+  .mname{min-height:38px;padding:6px 9px;font-size:14.5px;border-radius:8px}
+  .mflag{min-height:44px;padding:4px}
+  .mflag img{max-height:54px}
+}
 </style>
 
 </head>
