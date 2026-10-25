@@ -30,6 +30,7 @@ img{max-width:100%} [hidden]{display:none!important}
   --font-body:"Atkinson Hyperlegible", system-ui, -apple-system, "Segoe UI", sans-serif;
   color-scheme:dark;
 }
+[hidden]{display:none!important}
 html,body{height:100%}
 body{background:var(--bg);color:var(--ink);font-family:var(--font-body);font-size:15px;margin:0;overflow:hidden}
 .app{height:100%;display:flex;flex-direction:column;gap:10px;padding-block:10px;
@@ -57,6 +58,21 @@ button:focus-visible,select:focus-visible,input:focus-visible,.flag:focus-visibl
 .bar i{display:block;height:100%;width:0;background:var(--accent);transition:width .25s}
 .stage{position:relative;flex:1;min-height:0;overflow:auto;border-radius:12px;border:1px solid var(--line);background:var(--panel);-webkit-overflow-scrolling:touch}
 .inner{padding:14px}
+.stage.match{overflow:hidden}
+.stage.match .inner{height:100%;box-sizing:border-box;padding:10px}
+.mgrid{height:100%;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.15fr);grid-template-rows:minmax(0,1fr);gap:10px}
+.mcol{min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;display:flex;flex-direction:column;gap:8px;padding:3px 4px 48px}
+.mname{flex:none;text-align:left;border:1px solid var(--line);background:var(--tile);border-radius:10px;padding:10px 12px;font-weight:700;cursor:pointer;min-height:46px;line-height:1.25;overflow-wrap:anywhere}
+.mflag{flex:none;border:0;background:none;padding:7px;border-radius:10px;cursor:pointer;display:flex;justify-content:center;align-items:center;min-height:56px}
+.mflag img{display:block;max-width:100%;max-height:74px;width:auto;height:auto}
+@media (hover:hover){.mname:hover{border-color:var(--accent)}.mflag:hover{background:var(--tile)}}
+.mname.sel{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.mflag.sel{background:color-mix(in srgb,var(--accent) 28%,transparent);outline:3px solid var(--accent);outline-offset:-1px}
+.mname.bad,.mflag.bad{outline:3px solid var(--miss);outline-offset:1px;animation:shake .3s}
+.mname.only,.mflag.only{animation:pulse .45s ease-in-out 4}
+.mname.only{outline:3px solid var(--hit2)}
+.gone{opacity:0;transform:scale(.92);transition:opacity .25s,transform .25s;pointer-events:none}
+.target b img.mini{height:1.05em;width:auto;vertical-align:-.12em;display:inline-block}
 /* Board */
 .board{display:flex;flex-wrap:wrap;justify-content:center;align-items:center;gap:14px 12px}
 .fimg{filter:drop-shadow(0 0 .6px var(--edge)) drop-shadow(0 0 .6px var(--edge))}
@@ -129,6 +145,7 @@ button:focus-visible,select:focus-visible,input:focus-visible,.flag:focus-visibl
       <button data-mode="choice" aria-pressed="false">Name it</button>
       <button data-mode="similar" aria-pressed="false">Lookalikes</button>
       <button data-mode="type" aria-pressed="false">Type it</button>
+      <button data-mode="match" aria-pressed="false">Match</button>
       <button data-mode="study" aria-pressed="false">Study</button>
     </div>
   </div>
@@ -201,7 +218,7 @@ const GROUPS=[['IDN','MCO','POL','SGP'],['TCD','ROU','AND','MDA'],['IRL','CIV','
  ['BRB','BHS','KNA','JAM','TTO'],['VNM','CHN','MAR','HKG'],['KOR','JPN','MNG'],['BRA','PRT','BEN','GNB'],['SOM','FSM','TWN','NRU'],['UKR','RWA','SWE','PLW'],
  ['BMU','CYM','VGB','TCA','MSR','AIA','FLK','SHN','PCN','IOT'],['GBR','ENG','SCT','WLS','IMN','JEY','GGY','GIB']];
 const INGROUP=new Set(GROUPS.flat());
-const MODES = {board:'Click the flag of', choice:'Which flag is this?', similar:'Which flag is this?', type:'Type the name', study:'Study mode'};
+const MODES = {board:'Click the flag of', choice:'Which flag is this?', similar:'Which flag is this?', type:'Type the name', match:'Match each flag to its name', study:'Study mode'};
 
 const $=id=>document.getElementById(id);
 let region='World', fp=null, fpReady=null, mode='board', pool=[], queue=[], current=null, tries=0, mistakes=0, done=0, missed=[], status={}, t0=0, timer=null, finished=false, game=0;
@@ -230,6 +247,7 @@ const saveKey=()=>'flagquiz-save-'+region+'-'+mode;
 function save(){
   if(mode==='study') return;
   if(finished){ try{localStorage.removeItem(saveKey());}catch(e){} return; }
+  if(mode==='match'){ if(M) store(saveKey(),{m:[...M.left],hn:M.hn,hf:M.hf,w:M.w,status,missed,mistakes,done,elapsed:clock(),order:boardOrder,n:pool.length}); return; }
   const q = (current&&!status[current]) ? [current,...queue] : queue.slice();
   store(saveKey(),{q,status,missed,mistakes,done,tries:(current&&!status[current])?tries:0,elapsed:clock(),order:boardOrder,n:pool.length});
 }
@@ -244,9 +262,10 @@ function start(fresh){
   const study = mode==='study';
   $('stats').hidden=study; $('acts').hidden=study; $('barWrap').hidden=study;
   $('tLabel').textContent=MODES[mode];
-  $('inner').innerHTML=''; $('stage').scrollTop=0;
+  $('inner').innerHTML=''; $('stage').scrollTop=0; $('stage').classList.toggle('match',mode==='match'); $('skipBtn').hidden=mode==='match'; M=null;
   if(study){ $('tName').textContent=pool.length+' flags'; renderStudy(); return; }
-  if(mode==='similar' && !fp){ $('tName').textContent='Preparing lookalikes…'; const g=game; fpReady.then(()=>{ if(g===game) start(); }); return; }
+  if((mode==='similar'||mode==='match') && !fp){ $('tName').textContent='Preparing…'; const g=game; fpReady.then(()=>{ if(g===game) start(); }); return; }
+  if(mode==='match'){ startMatch(); return; }
   status={}; missed=[]; mistakes=0; done=0; finished=false; elapsed=0; boardOrder=null;
   const ids=new Set(pool.map(c=>c.id)), sv=store(saveKey());
   let resumeTries=0, resumed=false;
@@ -564,6 +583,126 @@ function narrow(c, from, size){
   const ranked=me?rest.filter(id=>fp[id]).sort((a,b)=>dist(me,fp[a])-dist(me,fp[b])):shuffle(rest);
   for(const id of ranked){ if(out.size>=size) break; out.add(id); }
   return out;
+}
+
+/* ---------- Match ---------- */
+// Finer geography for the "where is it" hints. Anything not listed falls back to its sub-region, then continent.
+const GEO=[
+ ['the Baltics','EST LVA LTU'],['the Nordic countries','DNK NOR SWE FIN ISL FRO ALA'],['the British Isles','GBR IRL ENG SCT WLS IMN JEY GGY'],
+ ['the Benelux countries','BEL NLD LUX'],['the Alps','CHE AUT LIE'],['the Iberian Peninsula','ESP PRT AND GIB'],['Italy, Malta and the microstates','ITA SMR VAT MLT MCO'],
+ ['Central Europe','DEU POL CZE SVK HUN'],['the Balkans','ALB BIH BGR HRV UNK MNE MKD SRB SVN GRC ROU'],['Eastern Europe','RUS UKR BLR MDA'],
+ ['the Caucasus','ARM AZE GEO'],['the Levant','ISR LBN SYR PSE JOR CYP'],['the Arabian Peninsula','SAU YEM OMN ARE QAT BHR KWT'],
+ ['mainland Southeast Asia','MMR THA LAO KHM VNM'],['the islands of Southeast Asia','MYS SGP IDN PHL BRN TLS'],
+ ['the Maghreb (northwest Africa)','MAR DZA TUN LBY MRT ESH'],['the Nile valley','EGY SDN SSD'],['the Horn of Africa','ETH ERI DJI SOM'],
+ ['the Sahel','MLI NER TCD BFA'],['West Africa’s Atlantic coast','SEN GMB GNB GIN SLE LBR CPV'],['the Gulf of Guinea','CIV GHA TGO BEN NGA CMR GNQ GAB STP'],
+ ['the Congo basin','CAF COG COD'],['the African Great Lakes','UGA RWA BDI KEN TZA'],['southern Africa','ZAF NAM BWA ZWE LSO SWZ MOZ ZMB MWI AGO'],
+ ['the Indian Ocean islands','MDG MUS SYC COM IOT CXR CCK'],['the South Atlantic islands','SHN FLK'],
+ ['the USA, Canada and Greenland','USA CAN GRL'],['Mexico and Central America','MEX GTM BLZ HND SLV NIC CRI PAN'],
+ ['the Greater Antilles','CUB JAM HTI DOM PRI CYM'],['the Lesser Antilles','ATG DMA GRD KNA LCA VCT BRB TTO AIA MSR VGB VIR ABW CUW SXM MTQ'],
+ ['the Atlantic north of the Caribbean','BHS TCA BMU'],['the Andes','COL ECU PER BOL VEN'],['the Southern Cone','ARG CHL URY PRY'],['the Guianas','GUY SUR'],
+ ['Australia and New Zealand','AUS NZL NFK'],['Melanesia','PNG SLB VUT FJI NCL'],['Micronesia','FSM MHL PLW NRU KIR GUM MNP'],['Polynesia','WSM TON TUV ASM COK NIU TKL PYF PCN']
+].map(([place,ids])=>({place,ids:ids.split(' ')}));
+const GEO_OF={}; GEO.forEach(g=>g.ids.forEach(id=>{ GEO_OF[id]=g; }));
+const kindOf=c=>['ENG','SCT','WLS'].includes(c.id)?'nation':kindWord(c);
+function geoSet(c, open){
+  const has=new Set(open), tiers=[];
+  if(GEO_OF[c.id]) tiers.push({place:GEO_OF[c.id].place, ids:GEO_OF[c.id].ids});
+  tiers.push({place:where(c), ids:ALL.filter(o=>o.sub===c.sub).map(o=>o.id)});
+  tiers.push({place:c.reg, ids:ALL.filter(o=>o.reg===c.reg).map(o=>o.id)});
+  let last=null;
+  for(const t of tiers){ const s=t.ids.filter(id=>has.has(id)); if(!s.includes(c.id)) s.push(c.id); last={place:t.place,set:s}; if(s.length>=3) return last; }
+  return last;
+}
+
+let M=null; // {left:Set of unmatched ids, hn:name-first hints, hf:flag-first hints, w:wrong counts, sel:{side,id}}
+function startMatch(){
+  status={}; missed=[]; mistakes=0; done=0; finished=false; elapsed=0; boardOrder=null; current=null; queue=[];
+  M={left:new Set(pool.map(c=>c.id)), hn:{}, hf:{}, w:{}, sel:null};
+  const ids=new Set(pool.map(c=>c.id)), sv=store(saveKey()); let resumed=false;
+  if(sv && sv.m && sv.n===pool.length && sv.m.length && sv.m.every(id=>ids.has(id))){
+    M.left=new Set(sv.m); M.hn=sv.hn||{}; M.hf=sv.hf||{}; M.w=sv.w||{};
+    status=sv.status||{}; missed=sv.missed||[]; mistakes=sv.mistakes||0; done=sv.done||0; elapsed=sv.elapsed||0;
+    boardOrder=(sv.order&&sv.order.length===pool.length)?sv.order:null; resumed=true;
+  }
+  if(!boardOrder) boardOrder=shuffle(pool.map(c=>c.id));
+  renderMatch();
+  timer=setInterval(()=>{ if(!finished) $('sTime').textContent=fmt(clock()); },250);
+  $('sTime').textContent=fmt(elapsed);
+  runClock(); updateStats(); matchPrompt();
+  if(resumed) toast('Picked up where you left off');
+  save();
+}
+function renderMatch(){
+  const grid=document.createElement('div'); grid.className='mgrid';
+  const names=document.createElement('div'); names.className='mcol'; names.id='mNames'; names.setAttribute('aria-label','Names');
+  const flags=document.createElement('div'); flags.className='mcol'; flags.id='mFlags'; flags.setAttribute('aria-label','Flags');
+  pool.slice().sort((a,b)=>a.name.localeCompare(b.name)).forEach(c=>{
+    if(!M.left.has(c.id)) return;
+    const b=document.createElement('button'); b.className='mname'; b.dataset.id=c.id; b.textContent=c.name; b.onclick=()=>pick('n',c.id); names.appendChild(b);
+  });
+  boardOrder.forEach(id=>{
+    if(!M.left.has(id)) return;
+    const b=document.createElement('button'); b.className='mflag'; b.dataset.id=id; b.setAttribute('aria-label','Flag'); b.appendChild(img(byId(id),'Flag')); b.onclick=()=>pick('f',id); flags.appendChild(b);
+  });
+  grid.append(names,flags); $('inner').replaceChildren(grid);
+}
+const mEl=(side,id)=>document.querySelector((side==='n'?'#mNames .mname':'#mFlags .mflag')+'[data-id="'+id+'"]');
+function matchPrompt(){
+  const s=M&&M.sel;
+  if(!s){ $('tLabel').textContent='Match each flag to its name'; $('tName').textContent='Tap a name or a flag'; return; }
+  if(s.side==='n'){ $('tLabel').textContent='Find the flag of'; $('tName').textContent=byId(s.id).name; return; }
+  $('tLabel').textContent='Which country has this flag?';
+  const i=img(byId(s.id),'Selected flag'); i.className='fimg mini';
+  $('tName').replaceChildren(i, document.createTextNode(' Tap its name'));
+}
+// Show everything, then apply the selected item's hint (hide all but the matching items on the other side).
+function applyFilter(){
+  const s=M.sel;
+  document.querySelectorAll('#mNames .mname').forEach(b=>{ b.hidden=false; b.classList.toggle('sel',!!s&&s.side==='n'&&b.dataset.id===s.id); b.classList.remove('only'); });
+  document.querySelectorAll('#mFlags .mflag').forEach(b=>{ b.hidden=false; b.classList.toggle('sel',!!s&&s.side==='f'&&b.dataset.id===s.id); b.classList.remove('only'); });
+  const h=s&&(s.side==='n'?M.hn:M.hf)[s.id];
+  if(!h||!h.lv){ $('hintLine').hidden=true; return; }
+  const other=s.side==='n'?'#mFlags .mflag':'#mNames .mname', show=new Set(h.lv>=3?[s.id]:h.set);
+  document.querySelectorAll(other).forEach(b=>{ b.hidden=!show.has(b.dataset.id); if(h.lv>=3&&b.dataset.id===s.id) b.classList.add('only'); });
+  $(s.side==='n'?'mFlags':'mNames').scrollTop=0;
+  showLine(h.text, h.lv>=3);
+}
+function select(s){ M.sel=s; applyFilter(); matchPrompt(); }
+function pick(side,id){
+  if(finished||!M.left.has(id)) return;
+  const s=M.sel;
+  if(!s||s.side===side){ select(s&&s.id===id&&s.side===side?null:{side,id}); return; }
+  if(id===s.id) matchPair(id); else wrongPick(s,id);
+}
+function wrongPick(s, wid){
+  const id=s.id, c=byId(id), map=s.side==='n'?M.hn:M.hf, h=map[id]||(map[id]={lv:0,set:null,text:''});
+  const wb=mEl(s.side==='n'?'f':'n', wid);
+  if(wb){ wb.classList.remove('bad'); void wb.offsetWidth; wb.classList.add('bad'); setTimeout(()=>wb.classList.remove('bad'),500); }
+  if(s.side==='n') toast('That’s the flag of '+byId(wid).name);
+  if(h.lv>=3) return;
+  mistakes++; M.w[id]=(M.w[id]||0)+1; h.lv++;
+  const open=[...M.left], left=3-h.lv, tail=' ('+left+' '+(left===1?'try':'tries')+' left)';
+  const prev=(h.set||open).filter(x=>M.left.has(x));
+  if(s.side==='n'){
+    if(h.lv===1){ const f=chooseFeature(c,open); h.set=f.set; h.text='Hint: look for a flag '+f.text+'. Showing the '+f.set.length+' that match.'+tail; }
+    else if(h.lv===2){ const size=prev.length>4?4:Math.min(2,prev.length); h.set=[...narrow(c, prev.length>1?prev:open, Math.max(size,1))]; h.text='Hint: it’s one of these '+h.set.length+' flags.'+tail; }
+    else { h.set=[c.id]; h.text='This is the flag of '+c.name+'.'+memoText(c)+' Tap it to match.'; }
+  } else {
+    if(h.lv===1){ const g=geoSet(c,open); h.set=g.set; h.text='Hint: this '+kindOf(c)+' is in '+g.place+'. Showing the '+g.set.length+' names there.'+tail; }
+    else if(h.lv===2){ const size=prev.length>4?4:Math.min(2,prev.length); h.set=[c.id,...shuffle(prev.filter(x=>x!==c.id)).slice(0,Math.max(size,1)-1)]; h.text='Hint: it’s one of these '+h.set.length+' names.'+tail; }
+    else { h.set=[c.id]; h.text='This is the flag of '+c.name+'.'+memoText(c)+' Tap the name to match.'; }
+  }
+  if(h.lv>=3&&!missed.includes(id)) missed.push(id);
+  updateStats(); applyFilter(); save();
+}
+function matchPair(id){
+  const rev=(M.hn[id]&&M.hn[id].lv>=3)||(M.hf[id]&&M.hf[id].lv>=3);
+  status[id]=rev?4:Math.min(3,(M.w[id]||0)+1); if(rev&&!missed.includes(id)) missed.push(id);
+  done++; M.left.delete(id); delete M.hn[id]; delete M.hf[id];
+  document.querySelectorAll('#inner [data-id="'+id+'"]').forEach(el=>{ el.classList.add('gone'); setTimeout(()=>el.remove(),280); });
+  toast((rev?'Matched: ':'✓ ')+byId(id).name);
+  M.sel=null; applyFilter(); matchPrompt(); updateStats(); save();
+  if(!M.left.size) setTimeout(()=>{ if(mode==='match'&&!finished) finish(); },350);
 }
 
 /* ---------- Study ---------- */
