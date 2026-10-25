@@ -220,6 +220,8 @@ ALL.forEach(c=>{ const svg=c.svg; c.src='data:image/svg+xml;charset=utf-8,'+enco
 const C = c=>c.kind==='country', T = c=>c.kind==='territory';
 const CATS = [];
 const cat=(group,key,label,filter)=>CATS.push({group,key,label,filter});
+let SMART=new Set();
+cat('Practice','smart','★ Smart study: flags you struggle with',c=>SMART.has(c.id));
 cat('Countries by continent','World','World: all countries',C);
 [['Africa','Africa'],['Asia','Asia'],['Europe','Europe'],['North America','North & Central America'],['South America','South America'],['Oceania','Oceania']]
   .forEach(([r,l])=>cat('Countries by continent',r,l,c=>C(c)&&c.reg===r));
@@ -254,6 +256,32 @@ const $=id=>document.getElementById(id);
 let region='World', fp=null, fpReady=null, mode='board', pool=[], queue=[], current=null, tries=0, mistakes=0, done=0, missed=[], status={}, t0=0, timer=null, finished=false, game=0;
 
 function store(key,val){try{ if(val===undefined) return JSON.parse(localStorage.getItem(key)); localStorage.setItem(key,JSON.stringify(val)); }catch(e){ return null; }}
+// ---- Learning history: one record per flag, shared by every game type and category ----
+// s = strength 0..5 (2 = neutral). Weak (s<=1) flags feed Smart study.
+const LEARN_KEY='flagquiz-learn';
+let LEARN=store(LEARN_KEY)||{};
+function learn(id, st, late){
+  const r=LEARN[id]||(LEARN[id]={s:2,n:0,m:0,t:0});
+  r.n++; r.t=Date.now();
+  if(st===1&&!late) r.s=Math.min(5,r.s+1);
+  else if(st===1) { r.s=Math.max(0,r.s-1); r.l=(r.l||0)+1; }
+  else if(st===2) { r.s=Math.max(0,Math.min(r.s-1,1)); r.m++; }
+  else { r.s=0; r.m++; }
+  store(LEARN_KEY,LEARN);
+}
+const SMART_SIZE=30;
+function buildSmart(){
+  const weak=ALL.filter(c=>LEARN[c.id]&&LEARN[c.id].s<=1)
+    .sort((a,b)=>LEARN[a.id].s-LEARN[b.id].s||LEARN[b.id].m-LEARN[a.id].m||LEARN[a.id].t-LEARN[b.id].t)
+    .slice(0,SMART_SIZE).map(c=>c.id);
+  const ids=weak.slice();
+  // Not enough history yet: top up with tricky lookalike flags you haven't been tested on.
+  const fillFrom=[...shuffle(ALL.filter(c=>C(c)&&INGROUP.has(c.id)&&!LEARN[c.id]).map(c=>c.id)),
+                  ...shuffle(ALL.filter(c=>C(c)&&INGROUP.has(c.id)&&LEARN[c.id]&&LEARN[c.id].s===2).map(c=>c.id)),
+                  ...ALL.filter(c=>LEARN[c.id]&&LEARN[c.id].s>1).sort((a,b)=>LEARN[a.id].s-LEARN[b.id].s).map(c=>c.id)];
+  for(const id of fillFrom){ if(ids.length>=SMART_SIZE) break; if(!ids.includes(id)) ids.push(id); }
+  return {ids, weak:weak.length, fill:ids.length-weak.length};
+}
 const fmt=ms=>{const s=Math.floor(ms/1000);return Math.floor(s/60)+':'+String(s%60).padStart(2,'0');};
 const shuffle=a=>{for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;};
 const byId=id=>ALL.find(c=>c.id===id);
@@ -277,9 +305,9 @@ const saveKey=()=>'flagquiz-save-'+region+'-'+mode;
 function save(){
   if(mode==='study') return;
   if(finished){ try{localStorage.removeItem(saveKey());}catch(e){} return; }
-  if(mode==='match'){ if(M) store(saveKey(),{m:[...M.left],hn:M.hn,hf:M.hf,w:M.w,status,missed,mistakes,done,elapsed:clock(),order:boardOrder,n:pool.length}); return; }
+  if(mode==='match'){ if(M) store(saveKey(),{ids:pool.map(c=>c.id),m:[...M.left],hn:M.hn,hf:M.hf,w:M.w,status,missed,mistakes,done,elapsed:clock(),order:boardOrder,n:pool.length}); return; }
   const q = (current&&!status[current]) ? [current,...queue] : queue.slice();
-  store(saveKey(),{q,status,missed,mistakes,done,tries:(current&&!status[current])?tries:0,elapsed:clock(),order:boardOrder,n:pool.length});
+  store(saveKey(),{ids:pool.map(c=>c.id),q,status,missed,mistakes,done,tries:(current&&!status[current])?tries:0,elapsed:clock(),order:boardOrder,n:pool.length});
 }
 document.addEventListener('visibilitychange',()=>{ if(document.hidden){ stopClock(); save(); } else runClock(); });
 window.addEventListener('pagehide',()=>{ stopClock(); save(); });
@@ -287,12 +315,20 @@ window.addEventListener('pagehide',()=>{ stopClock(); save(); });
 function start(fresh){
   if(fresh===true){ try{localStorage.removeItem(saveKey());}catch(e){} }
   game++; clearInterval(timer); stopClock(); $('over').hidden=true; clearHints();
+  let smartMsg='';
+  if(region==='smart'){
+    const sv0=mode==='study'?null:store(saveKey());
+    if(sv0&&sv0.ids&&sv0.ids.length) SMART=new Set(sv0.ids);
+    else { const b=buildSmart(); SMART=new Set(b.ids);
+      smartMsg=b.weak?('Smart study: '+b.weak+' flag'+(b.weak===1?'':'s')+' you’ve struggled with'+(b.fill?' + '+b.fill+' tricky ones':'')):'Smart study: no weak spots yet, so here are '+b.ids.length+' tricky lookalikes'; }
+  }
   pool = ALL.filter(catOf(region).filter);
   document.querySelectorAll('.seg button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.mode===mode));
   const study = mode==='study';
   $('stats').hidden=study; $('acts').hidden=study; $('barWrap').hidden=study;
   $('tLabel').textContent=MODES[mode];
   $('inner').innerHTML=''; $('stage').scrollTop=0; $('stage').classList.toggle('match',mode==='match'); $('skipBtn').hidden=mode==='match'; M=null;
+  if(smartMsg) setTimeout(()=>toast(smartMsg),50);
   if(study){ $('tName').textContent=pool.length+' flags'; renderStudy(); return; }
   if((mode==='similar'||mode==='match') && !fp){ $('tName').textContent='Preparing…'; const g=game; fpReady.then(()=>{ if(g===game) start(); }); return; }
   if(mode==='match'){ startMatch(); return; }
@@ -327,7 +363,7 @@ function next(){
 }
 // Called when the current target is resolved: s = 1..3 tries, 4 = missed.
 function resolve(s){
-  const id=current; status[id]=s; done++;
+  const id=current; status[id]=s; done++; learn(id,s,false);
   if(s===4){ missed.push(id); }
   updateStats(); save(); return id;
 }
@@ -728,6 +764,8 @@ function wrongPick(s, wid){
 function matchPair(id){
   const rev=(M.hn[id]&&M.hn[id].lv>=3)||(M.hf[id]&&M.hf[id].lv>=3);
   status[id]=rev?4:Math.min(3,(M.w[id]||0)+1); if(rev&&!missed.includes(id)) missed.push(id);
+  // Pairs left until the last quarter of a Match round count as "not sure yet".
+  learn(id, status[id], pool.length>=12 && done+1 > pool.length*0.75);
   done++; M.left.delete(id); delete M.hn[id]; delete M.hf[id];
   document.querySelectorAll('#inner [data-id="'+id+'"]').forEach(el=>{ el.classList.add('gone'); setTimeout(()=>el.remove(),280); });
   toast((rev?'Matched: ':'✓ ')+byId(id).name);
