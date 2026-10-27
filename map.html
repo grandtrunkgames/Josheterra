@@ -156,7 +156,7 @@ svg{display:block;width:100%;height:100%;touch-action:none;user-select:none;-web
   </div>
 
   <div class="mapwrap" id="mapwrap">
-    <svg id="map" role="img" aria-label="Map"><g id="zoomg"><g id="bgLayer"></g><g id="hullLayer"></g><g id="qLayer"></g><g id="dotLayer"></g><g id="labelLayer"></g></g></svg>
+    <svg id="map" role="img" aria-label="Map"><g id="zoomg"><g id="content"><g id="bgLayer"></g><g id="hullLayer"></g><g id="qLayer"></g><g id="dotLayer"></g><g id="labelLayer"></g></g><use id="copyL" href="#content"/><use id="copyR" href="#content"/></g></svg>
     <div class="loading" id="loading">Loading map…</div>
     <p class="hintline" id="hintLine" hidden></p>
     <div class="legend" id="legend">
@@ -205,13 +205,13 @@ const notAnt = WORLD.filter(f=>f.properties.region!=='Antarctic' && f.id!=='ATA'
 
 const isSA = f=>f.properties.sub==='South America';
 const QUIZZES = {
-  world:{name:'World: all countries', feats:notAnt, pick:f=>f.properties.quiz, proj:()=>d3.geoNaturalEarth1(), fit:{type:'FeatureCollection',features:notAnt}},
+  world:{name:'World: all countries', wrap:true, feats:notAnt, pick:f=>f.properties.quiz, proj:()=>d3.geoNaturalEarth1(), fit:{type:'FeatureCollection',features:notAnt}},
   africa:{name:'Africa', feats:notAnt, pick:f=>f.properties.quiz&&f.properties.region==='Africa', proj:()=>d3.geoMercator(), box:[[-20,-36],[56,38],[-20,38],[56,-36]]},
   europe:{name:'Europe', feats:notAnt, pick:f=>f.properties.quiz&&(f.properties.region==='Europe'||f.id==='TUR'), proj:()=>d3.geoConicConformal().rotate([-15,0]).parallels([40,65]), box:[[-24,34],[45,71],[-24,71],[45,34],[10,72]]},
   asia:{name:'Asia', feats:notAnt, pick:f=>f.properties.quiz&&f.properties.region==='Asia', proj:()=>d3.geoMercator(), box:[[26,-11],[146,54],[26,54],[146,-11]]},
   nam:{name:'North & Central America', feats:notAnt, pick:f=>f.properties.quiz&&f.properties.region==='Americas'&&!isSA(f), proj:()=>d3.geoConicConformal().rotate([95,0]).parallels([20,50]), box:[[-168,6],[-55,72],[-55,6],[-168,60]]},
   sam:{name:'South America', feats:notAnt, pick:f=>f.properties.quiz&&isSA(f), proj:()=>d3.geoMercator(), box:[[-82,-56],[-34,13]]},
-  oce:{name:'Oceania', feats:notAnt, pick:f=>f.properties.quiz&&f.properties.region==='Oceania', proj:()=>d3.geoMercator().rotate([-170,0]), box:[[112,-48],[-150,16],[112,16],[-150,-48]]},
+  oce:{name:'Oceania', wrap:true, feats:notAnt, pick:f=>f.properties.quiz&&f.properties.region==='Oceania', proj:()=>d3.geoMercator().rotate([-170,0]), box:[[112,-48],[-150,16],[112,16],[-150,-48]]},
   us:{name:'US states', feats:US, pick:()=>true, proj:()=>d3.geoAlbersUsa(), fit:{type:'FeatureCollection',features:US}},
 };
 
@@ -236,9 +236,13 @@ function draw(){
   const proj = q.proj();
   const fitObj = q.fit || {type:'MultiPoint',coordinates:q.box};
   proj.fitExtent([[8,8],[W-8,H-8]], fitObj);
-  path = d3.geoPath(proj);
+  path = d3.geoPath(proj); curProj=proj;
+  // World-spanning maps wrap around: a copy sits on each side, so panning past the Pacific keeps going.
+  WRAP=!!q.wrap;
+  if(WRAP){ const c=-proj.rotate()[0]; xL=proj([c-179.999,0])[0]; MW=proj([c+179.999,0])[0]-xL; }
+  d3.select('#copyL').attr('x',-MW).attr('display',WRAP?null:'none'); d3.select('#copyR').attr('x',MW).attr('display',WRAP?null:'none');
   svg.attr('viewBox',`0 0 ${W} ${H}`);
-  zoom.translateExtent([[-W*0.5,-H*0.5],[W*1.5,H*1.5]]).extent([[0,0],[W,H]]);
+  zoom.translateExtent(WRAP?[[-Infinity,-H*0.5],[Infinity,H*1.5]]:[[-W*0.5,-H*0.5],[W*1.5,H*1.5]]).extent([[0,0],[W,H]]);
 
   targets = q.feats.filter(q.pick);
   targetIds = new Set(targets.map(f=>f.id));
@@ -247,7 +251,7 @@ function draw(){
   d3.select('#bgLayer').selectAll('path').data(bg, d=>d.id).join('path').attr('class','bgc').attr('d', path);
   d3.select('#qLayer').selectAll('path').data(targets, d=>d.id).join('path')
     .attr('class', d=>'ctry q '+(status[d.id]?'s'+status[d.id]:'')+(selected===d.id?' sel':'')+(candSet.has(d.id)?' cand':'')+(tinyIds.has(d.id)?' tiny':''))
-    .attr('d', path).on('click', (e,d)=>clickCountry(d));
+    .attr('d', path).on('click', (e,d)=>{ e.__done=true; clickCountry(d); });
 
   // Small places get a round tap target.
   const small = targets.filter(f=>{const a=path.area(f);return isFinite(a)&&a<45;});
@@ -260,7 +264,7 @@ function draw(){
   d3.select('#dotLayer').selectAll('circle').data(dots, d=>d.f.id).join('circle')
     .attr('class', d=>'dot q '+(status[d.f.id]?'s'+status[d.f.id]:'')+(selected===d.f.id?' sel':'')+(candSet.has(d.f.id)?' cand':''))
     .attr('cx',d=>d.x).attr('cy',d=>d.y).attr('r', 7/k)
-    .on('click',(e,d)=>clickCountry(d.f));
+    .on('click',(e,d)=>{ e.__done=true; clickCountry(d.f); });
   // Island nations: one outline per cluster of islands (a cluster split by the map edge gets two).
   const hulls=[], hullExt={};
   targets.forEach(f=>{
@@ -282,7 +286,7 @@ function draw(){
   hulls.sort((a,b)=>b.ext-a.ext);
   d3.select('#hullLayer').selectAll('path').data(hulls,d=>d.key).join('path')
     .attr('class', d=>'hull q '+(status[d.f.id]?'s'+status[d.f.id]:'')+(selected===d.f.id?' sel':'')+(candSet.has(d.f.id)?' cand':''))
-    .on('click',(e,d)=>clickCountry(d.f));
+    .on('click',(e,d)=>{ e.__done=true; clickCountry(d.f); });
   d3.select('#dotLayer').selectAll('circle').each(d=>{ d.hx=hullExt[d.f.id]||0; });
   sizeDots();
   drawLabels();
@@ -293,7 +297,30 @@ const hullLine=d3.line().curve(d3.curveCatmullRomClosed.alpha(0.5));
 function hullPath(h,r){ const pts=[]; for(const pt of h) for(let a=0;a<8;a++) pts.push([pt[0]+r*Math.cos(a*Math.PI/4), pt[1]+r*Math.sin(a*Math.PI/4)]); return hullLine(d3.polygonHull(pts)); }
 function sizeDots(){ d3.select('#dotLayer').selectAll('circle').attr('r', 7/k).style('display', d=>(d.a*k*k>140||d.hx*k>26)?'none':null);
   d3.select('#hullLayer').selectAll('path').attr('d', d=>hullPath(d.h, 7/k)); d3.select('#labelLayer').selectAll('text').attr('font-size',13/k).attr('stroke-width',3/k); }
-zoom.on('zoom', e=>{ k=e.transform.k; zg.attr('transform', e.transform); sizeDots(); });
+zoom.on('zoom', e=>{ k=e.transform.k; zg.attr('transform', e.transform); sizeDots(); showCopies(e.transform); })
+    .on('end', e=>{ if(!WRAP) return; const t=e.transform, W=wrap.clientWidth, cx=(W/2-t.x)/t.k;
+      // After a pan, quietly hop back onto the main copy (it looks identical) so clicks and hints line up.
+      const shift=cx<xL?1:cx>xL+MW?-1:0;
+      if(shift) svg.call(zoom.transform, d3.zoomIdentity.translate(t.x-shift*MW*t.k, t.y).scale(t.k)); });
+let WRAP=false, MW=0, xL=0, curProj=null;
+function showCopies(t){
+  if(!WRAP) return; const W=wrap.clientWidth, vx0=(0-t.x)/t.k, vx1=(W-t.x)/t.k;
+  d3.select('#copyL').attr('display', vx0<xL?null:'none'); d3.select('#copyR').attr('display', vx1>xL+MW?null:'none');
+}
+// A tap on one of the copies: map it back onto the main copy and find what's there.
+function pickAt(pt){
+  const dot=d3.selectAll('#dotLayer circle').nodes().find(n=>n.style.display!=='none'&&Math.hypot(n.__data__.x-pt[0],n.__data__.y-pt[1])<=7/k);
+  if(dot) return dot.__data__.f;
+  const ll=curProj.invert(pt);
+  if(ll){ const f=targets.find(t=>d3.geoContains(t,ll)); if(f) return f; }
+  const h=d3.selectAll('#hullLayer path').data().slice().reverse().find(d=>d3.polygonContains(d.h,pt));
+  return h?h.f:null;
+}
+d3.selectAll('#copyL,#copyR').on('click', function(e){
+  if(e.__done) return;
+  const p=d3.pointer(e, document.getElementById('content')), off=this.id==='copyL'?-MW:MW;
+  const f=pickAt([p[0]-off,p[1]]); if(f) clickCountry(f);
+});
 
 function els(id){ return d3.selectAll('#qLayer path, #dotLayer circle, #hullLayer path').filter(d=> (d.f?d.f.id:d.id)===id); }
 function setStatus(id, s){ status[id]=s; els(id).classed('s1',s===1).classed('s2',s===2).classed('s3',s===3).classed('s4',s===4).classed('s5',s===5); }
