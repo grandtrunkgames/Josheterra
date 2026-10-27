@@ -12,7 +12,7 @@
 <link rel="icon" href="icons/icon-192.png">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <style>
-html{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+html{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:calc(env(safe-area-inset-bottom,0px) * .4)}
 body{margin:0;font-family:system-ui,-apple-system,sans-serif;-webkit-text-size-adjust:100%;-webkit-tap-highlight-color:transparent}
 img{max-width:100%} [hidden]{display:none!important}
 .home{display:inline-flex;align-items:center;gap:4px;text-decoration:none;font-weight:700;color:inherit;border:1px solid var(--line);background:var(--panel);border-radius:8px;padding:7px 10px}
@@ -21,27 +21,16 @@ img{max-width:100%} [hidden]{display:none!important}
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&display=swap">
 <style>
-/* Layout: one-screen app. Thin control strip, a prompt card, then the map fills the rest. */
+/* Layout: one-screen app. Thin control strip, a prompt card, then the map fills the rest. Always dark so answered (white) places stand out. */
 :root{
-  --bg:#e9eef2; --panel:#ffffff; --ink:#15212b; --muted:#5b6b78; --line:#cfd8df;
-  --sea:#b9d3e6; --land:#dfe6d4; --land-edge:#8a9a86; --bgland:#d3d8cc; --hover:#c9d8b4;
-  --accent:#0f5f8f; --accent-ink:#ffffff;
-  --hit1:#fbfbf6; --hit2:#f4d13b; --hit3:#f08b2c; --miss:#d63b2f; --study:#6aa6d6;
+  --bg:#2e3033; --panel:#3a3d41; --ink:#f1f2f3; --muted:#b0b5ba; --line:#50545a;
+  --sea:#1f3747; --land:#66756a; --land-edge:#262b29; --bgland:#454b48; --hover:#84968a;
+  --accent:#6cbcf0; --accent-ink:#08202f;
+  --hit1:#ffffff; --hit2:#f0cd3a; --miss:#ec5446; --study:#6cbcf0;
   --font-display:"Bricolage Grotesque", "Avenir Next", system-ui, sans-serif;
   --font-body:"Atkinson Hyperlegible", system-ui, -apple-system, "Segoe UI", sans-serif;
+  color-scheme:dark;
 }
-@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
-  --bg:#0f171e; --panel:#17222b; --ink:#e7eef3; --muted:#93a4b1; --line:#2a3946;
-  --sea:#112b3f; --land:#3c4a3f; --land-edge:#7f9283; --bgland:#2a332d; --hover:#56684f;
-  --accent:#5fb3e6; --accent-ink:#06202f;
-  --hit1:#f4f4ee; --hit2:#f0cd3a; --hit3:#ee8a2c; --miss:#e2493c; --study:#5aa0d8;
-  color-scheme:dark}}
-:root[data-theme="dark"]{
-  --bg:#0f171e; --panel:#17222b; --ink:#e7eef3; --muted:#93a4b1; --line:#2a3946;
-  --sea:#112b3f; --land:#3c4a3f; --land-edge:#7f9283; --bgland:#2a332d; --hover:#56684f;
-  --accent:#5fb3e6; --accent-ink:#06202f;
-  --hit1:#f4f4ee; --hit2:#f0cd3a; --hit3:#ee8a2c; --miss:#e2493c; --study:#5aa0d8;
-  color-scheme:dark}
 [hidden]{display:none!important}
 html,body{height:100%}
 body{background:var(--bg);color:var(--ink);font-family:var(--font-body);font-size:15px;margin:0;overflow:hidden}
@@ -66,6 +55,8 @@ select{background:var(--panel);border:1px solid var(--line);border-radius:8px;pa
 .btn{border:1px solid var(--line);background:var(--panel);border-radius:8px;padding:8px 12px;cursor:pointer;font-weight:700}
 .btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
 .btn:focus-visible,.seg button:focus-visible,select:focus-visible,.zoom button:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.hintline{flex-basis:100%;margin:0;font-weight:700;padding:7px 10px;border-radius:8px;background:color-mix(in srgb,var(--hit2) 22%,var(--panel));line-height:1.4}
+.hintline.bad{background:color-mix(in srgb,var(--miss) 20%,var(--panel))}
 .bar{height:4px;background:var(--line);border-radius:4px;overflow:hidden;flex-basis:100%}
 .bar i{display:block;height:100%;width:0;background:var(--accent);transition:width .25s}
 .mapwrap{position:relative;flex:1;min-height:0;border-radius:12px;overflow:hidden;border:1px solid var(--line);background:var(--sea)}
@@ -75,7 +66,8 @@ svg{display:block;width:100%;height:100%;touch-action:none;user-select:none;-web
 @media (hover:hover){.ctry.q:hover,.dot.q:hover{fill:var(--hover)}}
 .bgc{fill:var(--bgland);stroke:var(--land-edge);stroke-width:.4px;vector-effect:non-scaling-stroke;opacity:.8}
 .dot{fill:var(--land);stroke:var(--land-edge);stroke-width:1px;vector-effect:non-scaling-stroke;cursor:pointer}
-.s1{fill:var(--hit1)!important}.s2{fill:var(--hit2)!important}.s3{fill:var(--hit3)!important}.s4{fill:var(--miss)!important}
+.s1,.s2,.s3,.s4{fill:var(--hit1)!important}.s5{fill:var(--miss)!important}
+.cand{fill:var(--hit2)!important;stroke:#fff!important;stroke-width:1.6px!important}
 .sel{fill:var(--study)!important}
 .wrong{fill:var(--miss)!important;transition:none}
 .reveal{animation:blink .35s steps(2) 4}
@@ -97,7 +89,28 @@ svg{display:block;width:100%;height:100%;touch-action:none;user-select:none;-web
 .missed{display:flex;flex-wrap:wrap;gap:6px}
 .missed span{background:color-mix(in srgb,var(--miss) 18%,var(--panel));border-radius:6px;padding:3px 8px;font-size:13px;font-weight:700}
 .loading{position:absolute;inset:0;display:grid;place-items:center;color:var(--muted);font-weight:700}
-@media (max-width:520px){.stats{gap:12px}.stat span{font-size:16px}.brand{font-size:19px}.legend{display:none}}
+@media (max-width:520px){.legend{display:none}}
+/* Phones: compact header so the map gets most of the screen. */
+@media (max-width:600px){
+  .app{gap:6px;padding-block:16px 2px}
+  .top{gap:6px;flex-wrap:nowrap}
+  .brand{display:none}
+  .top select{flex:1 1 0;min-width:0;padding:6px 8px;font-size:15px}
+  .seg button{padding:6px 10px;font-size:14px}
+  .prompt{padding:6px 10px;gap:2px 10px;border-radius:10px}
+  .target{flex-basis:100%}
+  .target small{font-size:10.5px}
+  .target b{font-size:20px}
+  .stats{gap:12px;align-items:baseline}
+  .stat{display:flex;align-items:baseline;gap:4px}
+  .stat small{font-size:10px}
+  .stat span{font-size:14px}
+  .actions{margin-left:auto}
+  .actions .btn{padding:4px 10px;font-size:13px}
+  .hintline{padding:5px 8px;font-size:13.5px}
+  .bar{height:3px}
+  .mapwrap{border-radius:10px}
+}
 @media (prefers-reduced-motion:reduce){.reveal{animation:none;fill:var(--miss)!important}.bar i{transition:none}}
 </style>
 
@@ -125,6 +138,7 @@ svg{display:block;width:100%;height:100%;touch-action:none;user-select:none;-web
       <button class="btn" id="skipBtn">Skip</button>
       <button class="btn" id="restartBtn">Restart</button>
     </div>
+    <p class="hintline" id="hintLine" hidden></p>
     <div class="bar"><i id="bar"></i></div>
   </div>
 
@@ -132,9 +146,8 @@ svg{display:block;width:100%;height:100%;touch-action:none;user-select:none;-web
     <svg id="map" role="img" aria-label="Map"><g id="zoomg"><g id="bgLayer"></g><g id="qLayer"></g><g id="dotLayer"></g><g id="labelLayer"></g></g></svg>
     <div class="loading" id="loading">Loading map…</div>
     <div class="legend" id="legend">
-      <span><i style="background:var(--hit1)"></i>1st try</span>
-      <span><i style="background:var(--hit2)"></i>2nd</span>
-      <span><i style="background:var(--hit3)"></i>3rd</span>
+      <span><i style="background:var(--hit1)"></i>Found</span>
+      <span><i style="background:var(--hit2)"></i>Hint</span>
       <span><i style="background:var(--miss)"></i>Missed</span>
     </div>
     <div class="zoom">
@@ -219,7 +232,7 @@ function draw(){
 
   d3.select('#bgLayer').selectAll('path').data(bg, d=>d.id).join('path').attr('class','bgc').attr('d', path);
   d3.select('#qLayer').selectAll('path').data(targets, d=>d.id).join('path')
-    .attr('class', d=>'ctry q '+(status[d.id]?'s'+status[d.id]:'')+(selected===d.id?' sel':''))
+    .attr('class', d=>'ctry q '+(status[d.id]?'s'+status[d.id]:'')+(selected===d.id?' sel':'')+(candSet.has(d.id)?' cand':''))
     .attr('d', path).on('click', (e,d)=>clickCountry(d));
 
   // Small places get a round tap target.
@@ -230,7 +243,7 @@ function draw(){
     const c = path.centroid(best||f); return {f, x:c[0], y:c[1]};
   }).filter(d=>isFinite(d.x));
   d3.select('#dotLayer').selectAll('circle').data(dots, d=>d.f.id).join('circle')
-    .attr('class', d=>'dot q '+(status[d.f.id]?'s'+status[d.f.id]:'')+(selected===d.f.id?' sel':''))
+    .attr('class', d=>'dot q '+(status[d.f.id]?'s'+status[d.f.id]:'')+(selected===d.f.id?' sel':'')+(candSet.has(d.f.id)?' cand':''))
     .attr('cx',d=>d.x).attr('cy',d=>d.y).attr('r', 7/k)
     .on('click',(e,d)=>clickCountry(d.f));
   sizeDots();
@@ -241,7 +254,7 @@ function sizeDots(){ d3.select('#dotLayer').selectAll('circle').attr('r', 7/k); 
 zoom.on('zoom', e=>{ k=e.transform.k; zg.attr('transform', e.transform); sizeDots(); });
 
 function els(id){ return d3.selectAll('#qLayer path, #dotLayer circle').filter(d=> (d.f?d.f.id:d.id)===id); }
-function setStatus(id, s){ status[id]=s; els(id).classed('s1',s===1).classed('s2',s===2).classed('s3',s===3).classed('s4',s===4); }
+function setStatus(id, s){ status[id]=s; els(id).classed('s1',s===1).classed('s2',s===2).classed('s3',s===3).classed('s4',s===4).classed('s5',s===5); }
 
 function drawLabels(){
   const lab = [];
@@ -259,6 +272,322 @@ let toastT;
 function toast(msg){ const t=$('toast'); t.textContent=msg; t.hidden=false; clearTimeout(toastT); toastT=setTimeout(()=>t.hidden=true,1600); }
 
 function shuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
+
+/* ---------- Hints ---------- */
+// Finer areas for the location hint. Anything not listed falls back to its sub-region.
+const GEO=[
+ ['the Baltics','EST LVA LTU'],['the Nordic countries','DNK NOR SWE FIN ISL'],['the British Isles','GBR IRL'],
+ ['the Benelux countries','BEL NLD LUX'],['the Alps','CHE AUT LIE'],['the Iberian Peninsula','ESP PRT AND'],['Italy, Malta and the microstates','ITA SMR VAT MLT MCO'],
+ ['Central Europe','DEU POL CZE SVK HUN'],['the Balkans','ALB BIH BGR HRV UNK MNE MKD SRB SVN GRC ROU'],['Eastern Europe','RUS UKR BLR MDA'],
+ ['the Caucasus','ARM AZE GEO'],['the Middle East','IRN IRQ TUR'],['the Levant','ISR LBN SYR PSE JOR CYP'],['the Arabian Peninsula','SAU YEM OMN ARE QAT BHR KWT'],
+ ['mainland Southeast Asia','MMR THA LAO KHM VNM'],['the islands of Southeast Asia','MYS SGP IDN PHL BRN TLS'],
+ ['the Maghreb (northwest Africa)','MAR DZA TUN LBY MRT ESH'],['the Nile valley','EGY SDN SSD'],['the Horn of Africa','ETH ERI DJI SOM'],
+ ['the Sahel','MLI NER TCD BFA'],['West Africa’s Atlantic coast','SEN GMB GNB GIN SLE LBR CPV'],['the Gulf of Guinea','CIV GHA TGO BEN NGA CMR GNQ GAB STP'],
+ ['the Congo basin','CAF COG COD'],['the African Great Lakes','UGA RWA BDI KEN TZA'],['southern Africa','ZAF NAM BWA ZWE LSO SWZ MOZ ZMB MWI AGO'],
+ ['the Indian Ocean islands','MDG MUS SYC COM'],['North America','USA CAN'],['Mexico and Central America','MEX GTM BLZ HND SLV NIC CRI PAN'],
+ ['the Greater Antilles','CUB JAM HTI DOM'],['the Lesser Antilles','ATG DMA GRD KNA LCA VCT BRB TTO'],['the Bahamas area, southeast of Florida','BHS'],
+ ['the Andes','COL ECU PER BOL VEN'],['the Southern Cone','ARG CHL URY PRY'],['the Guianas','GUY SUR'],
+ ['Australia and New Zealand','AUS NZL'],['Melanesia','PNG SLB VUT FJI'],['Micronesia','FSM MHL PLW NRU KIR'],['Polynesia','WSM TON TUV'],
+ // US states
+ ['New England','ME NH VT MA RI CT'],['the Mid-Atlantic','NY NJ PA DE MD'],['the Southeast','VA WV NC SC GA FL AL MS TN KY'],
+ ['the Great Lakes region','OH MI IN IL WI MN'],['the Great Plains','ND SD NE KS IA MO'],['the South Central states','AR LA OK TX'],
+ ['the Southwest','AZ NM NV UT'],['the Rocky Mountains','CO WY MT ID'],['the Pacific coast','CA OR WA'],['outside the lower 48','AK HI']
+].map(([place,ids])=>({place,ids:ids.split(' ')}));
+const GEO_OF={}; GEO.forEach(g=>g.ids.forEach(id=>{ GEO_OF[id]=g; }));
+const SUBNAME={'Northern Africa':'North Africa','Western Africa':'West Africa','Middle Africa':'Central Africa','Eastern Africa':'East Africa','Southern Africa':'southern Africa',
+ 'Western Asia':'western Asia','Central Asia':'Central Asia','Southern Asia':'South Asia','Eastern Asia':'East Asia','South-Eastern Asia':'Southeast Asia',
+ 'Northern Europe':'Northern Europe','Western Europe':'Western Europe','Central Europe':'Central Europe','Eastern Europe':'Eastern Europe','Southern Europe':'Southern Europe','Southeast Europe':'Southeast Europe',
+ 'Caribbean':'the Caribbean','Central America':'Central America','South America':'South America','North America':'North America',
+ 'Australia and New Zealand':'Australia and New Zealand','Melanesia':'Melanesia','Micronesia':'Micronesia','Polynesia':'Polynesia'};
+function placeOf(f){ const g=GEO_OF[f.id]; if(g) return g.place; const s=f.properties.sub; return SUBNAME[s]||s||f.properties.region||'this map'; }
+
+// One defining feature per place: its shape, a landmark, or something it's known for.
+const CHAR={
+AFG:'It’s landlocked, with a long thin finger (the Wakhan Corridor) poking east to touch China',
+ALB:'It’s a small country on the Adriatic coast, right across the water from the heel of Italy',
+DZA:'It’s Africa’s biggest country: a huge, mostly Sahara block with a Mediterranean coast',
+AND:'It’s a tiny landlocked country high in the Pyrenees, between France and Spain',
+AGO:'It’s a large country on the Atlantic coast, with a small detached piece (Cabinda) further north',
+ATG:'It’s two small islands in the eastern Caribbean',
+ARG:'It’s long and tapering, running down to the southern tip of South America on the east side of the Andes',
+ARM:'It’s small, landlocked and mountainous, with the big Lake Sevan in its east',
+AUS:'It’s a whole continent',
+AUT:'It’s landlocked and shaped like a tadpole or a leg of ham, with the thin end pointing west',
+AZE:'It sits on the Caspian Sea, with a separate chunk (Nakhchivan) cut off to the west',
+BHS:'It’s a long chain of flat islands just southeast of Florida',
+BHR:'It’s a tiny island in the Persian Gulf, next to Qatar',
+BGD:'It’s almost entirely surrounded by India, on a huge river delta at the Bay of Bengal',
+BRB:'It’s a single small island, the easternmost in the Caribbean',
+BLR:'It’s landlocked and flat, full of forests and marshes, between Poland and Russia',
+BEL:'It’s a small, roughly triangular country with a short North Sea coast',
+BLZ:'It’s a small country on the Caribbean coast, just below Mexico’s Yucatán Peninsula',
+BEN:'It’s a narrow strip running north from the coast, right next to Nigeria',
+BTN:'It’s a small Himalayan kingdom tucked between India and China',
+BOL:'It’s landlocked, high in the Andes, and shares Lake Titicaca with Peru',
+BIH:'It’s a rough triangle almost wrapped by Croatia, with only a tiny sliver of coast',
+BWA:'It’s landlocked and mostly Kalahari Desert, with the Okavango Delta in its northwest',
+BRA:'It’s huge, covering nearly half of South America',
+BRN:'It’s tiny, on the north coast of Borneo, split into two pieces surrounded by Malaysia',
+BGR:'It sits on the Black Sea, with the Danube forming most of its northern border',
+BFA:'It’s landlocked in West Africa; its capital is Ouagadougou',
+BDI:'It’s tiny and landlocked, on the northeast shore of Lake Tanganyika',
+CPV:'It’s a cluster of islands far out in the Atlantic, west of Senegal',
+KHM:'It’s roughly square, with the big Tonlé Sap lake in its middle and the Mekong flowing through',
+CMR:'It’s a triangle with a long thin tail reaching north up to Lake Chad',
+CAN:'It’s enormous, covering most of the northern half of North America',
+CAF:'It’s landlocked, right in the centre of Africa',
+TCD:'It’s large and landlocked, with Lake Chad on its western edge',
+CHL:'It’s extremely long and thin, running down the west coast of South America',
+CHN:'It’s huge, the biggest country in East Asia',
+COL:'It sits in South America’s northwest corner, with coasts on both the Caribbean and the Pacific',
+COM:'It’s a few small islands between Madagascar and Mozambique',
+COG:'It’s west of the much bigger DR Congo, with a short Atlantic coast; the Congo River forms their border',
+COD:'It’s huge and in the middle of Africa, with only a tiny strip of Atlantic coast',
+CRI:'It’s a small country on the isthmus between Nicaragua and Panama, with coasts on both oceans',
+CIV:'It’s roughly square, on the Gulf of Guinea between Liberia and Ghana',
+HRV:'It’s boomerang-shaped, wrapping around Bosnia, with a long island-dotted Adriatic coast',
+CUB:'It’s the biggest Caribbean island: long and thin, just south of Florida',
+CYP:'It’s an island in the far eastern corner of the Mediterranean, south of Turkey',
+CZE:'It’s landlocked and ringed by mountains, in the heart of Europe east of Germany',
+DNK:'It’s a peninsula (Jutland) sticking north from Germany, plus a scatter of islands',
+DJI:'It’s tiny, at the mouth of the Red Sea in the Horn of Africa',
+DMA:'It’s a single small, mountainous island in the eastern Caribbean',
+DOM:'It’s the eastern two-thirds of the island of Hispaniola',
+ECU:'It’s small, on South America’s Pacific coast, sitting right on the equator',
+EGY:'It’s almost a square in Africa’s northeast corner, with the Nile running up through it',
+SLV:'It’s the smallest country in Central America, with only a Pacific coast',
+GNQ:'It’s a small square on the mainland plus the island of Bioko offshore',
+ERI:'It’s a thin strip along the Red Sea coast',
+EST:'It’s the northernmost Baltic state, with many islands off its west coast',
+SWZ:'It’s tiny and landlocked, almost surrounded by South Africa',
+ETH:'It’s large, landlocked and mountainous, filling most of the Horn of Africa’s interior',
+FJI:'It’s a group of islands in the South Pacific, sitting on the 180° line',
+FIN:'It’s shaped like a person with one arm raised, and covered in thousands of lakes',
+FRA:'It’s roughly a hexagon; the French even call it l’Hexagone',
+GAB:'It’s roughly square, on the Atlantic coast right on the equator',
+GMB:'It’s a thin ribbon of land along a river, completely surrounded by Senegal except at the coast',
+GEO:'It sits on the Black Sea’s eastern shore, with the Caucasus mountains along its north',
+DEU:'It’s big and in the middle of Europe, with coasts on both the North Sea and the Baltic',
+GHA:'It has Lake Volta, one of the world’s largest man-made lakes, filling much of its middle',
+GRC:'It’s the southern tip of the Balkans, with a hand-shaped peninsula and lots of islands',
+GRD:'It’s a small island near the south end of the Caribbean chain, north of Trinidad',
+GTM:'It’s just south of Mexico, with a long Pacific coast and a tiny Caribbean one',
+GIN:'It’s curved like a boomerang, bending around Sierra Leone and Liberia',
+GNB:'It’s small, with lots of islands off its coast, between Senegal and Guinea',
+GUY:'It’s the westernmost of the three Guianas, on South America’s northeast coast',
+HTI:'It’s the western third of Hispaniola, shaped like a crab claw opening west',
+HND:'It has a long Caribbean coast and just a tiny opening onto the Pacific',
+HUN:'It’s landlocked, with the large Lake Balaton; the Danube runs through its capital',
+ISL:'It’s an island in the North Atlantic, just below the Arctic Circle',
+IND:'It’s a huge triangle pointing south into the Indian Ocean',
+IDN:'It’s thousands of islands strung along the equator',
+IRN:'It’s large, stretching from the Caspian Sea down to the Persian Gulf',
+IRQ:'The Tigris and Euphrates run through it, and it has only a tiny Persian Gulf coast',
+IRL:'It covers most of the island just west of Great Britain',
+ISR:'It’s a narrow strip on the Mediterranean that tapers south to a point at the Red Sea',
+ITA:'It’s shaped like a boot',
+JAM:'It’s an island just south of Cuba',
+JPN:'It’s a long arc of islands off the east coast of Asia',
+JOR:'It’s nearly landlocked, with just a tiny coast at the Red Sea, and the Dead Sea on its western edge',
+KAZ:'It’s the world’s largest landlocked country, stretching from the Caspian Sea almost to China',
+KEN:'It sits on the Indian Ocean, with the equator running straight through it',
+KIR:'It’s tiny coral atolls scattered across the middle of the Pacific',
+PRK:'It’s the northern half of the Korean Peninsula',
+KOR:'It’s the southern half of the Korean Peninsula',
+UNK:'It’s small and landlocked, bordering Serbia, Albania and North Macedonia',
+KWT:'It’s small, tucked into the very top of the Persian Gulf',
+KGZ:'It’s landlocked and mountainous, with the huge Lake Issyk-Kul in its east',
+LAO:'It’s landlocked and long, curving along the Mekong River',
+LVA:'It’s the middle Baltic state, wrapped around the Gulf of Riga',
+LBN:'It’s a small strip on the Mediterranean coast, just north of Israel',
+LSO:'It’s tiny, mountainous, and completely surrounded by South Africa',
+LBR:'It’s on the West African coast, between Sierra Leone and Ivory Coast',
+LBY:'It’s large and mostly desert, on the Mediterranean between Egypt and Algeria',
+LIE:'It’s tiny, squeezed between Switzerland and Austria',
+LTU:'It’s the largest and southernmost Baltic state, with only a short coastline',
+LUX:'It’s tiny and landlocked, where Belgium, France and Germany meet',
+MDG:'It’s a large island off the southeast coast of Africa',
+MWI:'It’s long and thin, running along the length of Lake Malawi',
+MYS:'It’s in two parts: the end of the Malay Peninsula and the north of Borneo',
+MDV:'It’s a long chain of tiny atolls southwest of India',
+MLI:'It’s landlocked and shaped like a bow tie or butterfly, with the Niger River bending through it',
+MLT:'It’s a few tiny islands in the Mediterranean, just south of Sicily',
+MHL:'It’s two chains of coral atolls in the north Pacific',
+MRT:'It’s mostly Sahara, on Africa’s Atlantic coast just north of Senegal',
+MUS:'It’s a small island east of Madagascar',
+MEX:'It curves down from the USA to the Yucatán, with the long Baja California peninsula on its west',
+FSM:'It’s hundreds of small islands spread across the western Pacific',
+MDA:'It’s small and landlocked, said to look like a bunch of grapes',
+MCO:'It’s tiny, a city-state on the French Riviera',
+MNG:'It’s big and landlocked, sandwiched between Russia and China',
+MNE:'It’s small and mountainous, with a short Adriatic coast and the fjord-like Bay of Kotor',
+MAR:'It’s Africa’s northwest corner, facing Spain across the Strait of Gibraltar',
+MOZ:'It has a very long Indian Ocean coast, with an arm reaching inland around Malawi',
+MMR:'It’s shaped like a kite, with a long tail running south down the Malay Peninsula',
+NAM:'It has a long desert coast on the Atlantic and a thin finger (the Caprivi Strip) pointing east',
+NRU:'It’s a single tiny island in the Pacific',
+NPL:'It’s a long rectangle along the Himalayas, with Mount Everest on its border',
+NLD:'It’s low and flat, with much of it below sea level',
+NZL:'It’s two long main islands in the southwest Pacific',
+NIC:'It’s the largest Central American country, with coasts on both oceans and a huge lake',
+NER:'It’s a big landlocked country shaped like a chicken drumstick, with the narrow end in the southwest',
+NGA:'The Niger and Benue rivers join in its middle, forming a big Y',
+MKD:'It’s small and landlocked, with Lake Ohrid on its southwest border',
+NOR:'It’s long and thin along Scandinavia’s west coast, cut deeply by fjords',
+OMN:'It’s the southeast corner of the Arabian Peninsula, plus a detached tip at the Strait of Hormuz',
+PAK:'The Indus River runs down its length, from the mountains to the Arabian Sea',
+PLW:'It’s a small group of islands in the western Pacific, east of the Philippines',
+PSE:'It’s two separate pieces: the West Bank and the Gaza Strip',
+PAN:'It’s an S-shaped strip joining Central America to South America',
+PNG:'It’s the eastern half of the island of New Guinea, plus smaller islands',
+PRY:'It’s landlocked, split by the Paraguay River into a wet east and the dry Chaco in the west',
+PER:'It’s on South America’s Pacific coast, with the Andes running through it and part of Lake Titicaca',
+PHL:'It’s an archipelago of over 7,000 islands',
+POL:'It’s roughly square, with a Baltic Sea coast in the north',
+PRT:'It’s a tall rectangle on the Atlantic edge of the Iberian Peninsula',
+QAT:'It’s a small thumb-shaped peninsula sticking up into the Persian Gulf',
+ROU:'It’s roughly round, with the Carpathian Mountains curving through it and the Danube delta on its coast',
+RUS:'It’s the largest country in the world, stretching across Europe and Asia',
+RWA:'It’s tiny, landlocked and hilly; it’s called the land of a thousand hills',
+KNA:'It’s two tiny islands in the eastern Caribbean',
+LCA:'It’s a small mountainous island in the eastern Caribbean',
+VCT:'It’s one main island plus a chain of tiny islands trailing south toward Grenada',
+WSM:'It’s two main islands in the South Pacific',
+SMR:'It’s tiny and completely surrounded by Italy',
+STP:'It’s two small islands in the Gulf of Guinea, off Gabon',
+SAU:'It covers most of the Arabian Peninsula',
+SEN:'It holds Africa’s westernmost point, and wraps around the Gambia',
+SRB:'It’s landlocked in the central Balkans, with the Danube flowing through its capital',
+SYC:'It’s a scatter of islands in the Indian Ocean, northeast of Madagascar',
+SLE:'It’s small and roughly round, on the West African coast',
+SGP:'It’s a tiny island city at the southern tip of the Malay Peninsula',
+SVK:'It’s landlocked and long from west to east, with the High Tatras mountains along its north',
+SVN:'It’s small, with a sliver of Adriatic coast; people say it looks like a running chicken',
+SLB:'It’s a double chain of islands east of Papua New Guinea',
+SOM:'It’s shaped like the number 7, wrapping around the Horn of Africa',
+ZAF:'It’s Africa’s southern tip, with the small country of Lesotho completely inside it',
+SSD:'It’s landlocked, with the White Nile flowing through huge wetlands; it’s the world’s newest country',
+ESP:'It covers most of the Iberian Peninsula',
+LKA:'It’s a teardrop-shaped island just south of India',
+SDN:'It’s large, with the Nile running through it and a Red Sea coast',
+SUR:'It’s the smallest country in South America, between Guyana and French Guiana',
+SWE:'It’s long and narrow, on the eastern side of the Scandinavian Peninsula',
+CHE:'It’s landlocked and covered by the Alps, with Lake Geneva at its southwest corner',
+SYR:'It sits between the Mediterranean and Iraq, with the Euphrates crossing it',
+TWN:'It’s a leaf-shaped island off the southeast coast of China',
+TJK:'It’s landlocked and very mountainous (the Pamirs), with an arm reaching northwest into the Fergana Valley',
+TZA:'It has Mount Kilimanjaro in its north and the island of Zanzibar off its coast',
+THA:'It’s shaped like an elephant’s head, with the trunk running down the Malay Peninsula',
+TLS:'It’s the eastern half of the island of Timor',
+TGO:'It’s a very narrow strip running north from the coast, between Ghana and Benin',
+TON:'It’s a chain of small islands in the South Pacific',
+TTO:'It’s two islands just off the coast of Venezuela',
+TUN:'It’s Africa’s northernmost country, a narrow shape on the Mediterranean',
+TUR:'It’s a wide rectangle that’s mostly the Anatolian peninsula, with a small piece in Europe around Istanbul',
+TKM:'It’s mostly the Karakum desert, on the eastern shore of the Caspian Sea',
+TUV:'It’s a handful of tiny atolls in the South Pacific',
+UGA:'It’s landlocked, on the northern shore of Lake Victoria',
+UKR:'It’s large, along the Black Sea’s northern coast, with the Dnieper River running down its middle',
+ARE:'It’s a wedge on the Persian Gulf coast, home to Dubai and Abu Dhabi',
+GBR:'It’s Great Britain plus the northeast corner of Ireland',
+USA:'It’s the big country between Canada and Mexico, plus Alaska and Hawaii',
+URY:'It’s small, on the Atlantic coast between Argentina and Brazil',
+UZB:'It’s doubly landlocked: even its neighbours have no sea coast',
+VUT:'It’s a Y-shaped chain of islands in the South Pacific',
+VAT:'It’s the world’s smallest country, inside the city of Rome',
+VEN:'It has a long Caribbean coast, with the Orinoco River and Angel Falls inland',
+VNM:'It’s long and S-shaped, running down the east coast of mainland Southeast Asia',
+ESH:'It’s a desert territory on Africa’s Atlantic coast, just south of Morocco',
+YEM:'It’s the southwest corner of the Arabian Peninsula',
+ZMB:'It’s landlocked, pinched in the middle by a finger of DR Congo, with Victoria Falls on its southern border',
+ZWE:'It’s landlocked, between the Zambezi and Limpopo rivers, with Victoria Falls on its northwest border',
+// US states
+AL:'It’s a tall rectangle with a short stretch of Gulf coast at Mobile Bay in its southwest corner',
+AK:'It’s the biggest state, in the far northwest next to Canada',
+AZ:'It’s home to the Grand Canyon, with the Colorado River along its western edge',
+AR:'It’s roughly square, with the Mississippi River forming its wiggly eastern border',
+CA:'It’s long and curves down the Pacific coast',
+CO:'It’s an almost perfect rectangle in the Rocky Mountains',
+CT:'It’s a small rectangle on Long Island Sound, between New York and Rhode Island',
+DE:'It’s tiny, with a rounded northern border, on the Delmarva Peninsula',
+FL:'It’s a long peninsula pointing south, with a panhandle along the Gulf',
+GA:'It’s the largest state east of the Mississippi, with Atlanta and an Atlantic coast',
+HI:'It’s a chain of volcanic islands in the middle of the Pacific',
+ID:'It has a thin panhandle pointing north up to Canada, like a chair or a pistol',
+IL:'It’s tall and narrow, with Chicago on Lake Michigan at the top',
+IN:'It’s a tall rectangle with a short Lake Michigan shore at its top-left',
+IA:'The Mississippi and Missouri rivers form its wavy east and west borders',
+KS:'It’s a rectangle with a small notch in its northeast corner',
+KY:'It’s long and wavy, with the Ohio River forming its northern border',
+LA:'It’s shaped like a boot, at the mouth of the Mississippi',
+ME:'It’s the northeasternmost state, poking up into Canada',
+MD:'It’s oddly shaped, wrapped around Chesapeake Bay, with a thin panhandle to the west',
+MA:'It has Cape Cod curling out into the Atlantic like a flexed arm',
+MI:'It’s two peninsulas: the lower one is shaped like a mitten',
+MN:'It sits on Lake Superior, with a small bump (the Northwest Angle) poking up into Canada',
+MS:'It’s a tall rectangle with the Mississippi River as its wavy western border and a short Gulf coast',
+MO:'It has a small bootheel sticking down from its southeast corner',
+MT:'It’s big and wide along the Canadian border, with a jagged southwest edge',
+NE:'It’s a rectangle with a panhandle sticking out to the west',
+NV:'It has a slanted southwestern border and is home to Las Vegas',
+NH:'It’s a narrow wedge, wide at the bottom, with a tiny stretch of coast',
+NJ:'It sits on the Atlantic between New York City and Philadelphia',
+NM:'It’s almost square, with a small notch in its southwest corner',
+NY:'It has Long Island stretching east into the Atlantic',
+NC:'It’s long and wide, with the Outer Banks barrier islands along its coast',
+ND:'It’s a rectangle on the Canadian border, in the northern Great Plains',
+OH:'It’s roughly heart-shaped, with Lake Erie along its north',
+OK:'It’s shaped like a frying pan, with a long thin panhandle to the west',
+OR:'It’s on the Pacific coast between California and Washington',
+PA:'It’s a wide rectangle with a little chimney at the top-left reaching Lake Erie',
+RI:'It’s the smallest state, wrapped around Narragansett Bay',
+SC:'It’s a triangle on the Atlantic coast',
+SD:'It’s a rectangle with the Missouri River down its middle, home to Mount Rushmore',
+TN:'It’s long, thin and flat, like a parallelogram',
+TX:'It’s the second-biggest state, with a panhandle at the top',
+UT:'It’s a rectangle with a notch cut out of its top-right corner',
+VT:'It’s a narrow wedge, wide at the top, and landlocked',
+VA:'It’s a triangle pointing west, with Chesapeake Bay on its east',
+WA:'It’s the northwest corner of the lower 48, with Puget Sound cut into it',
+WV:'It’s very irregular, with two panhandles, one north and one east',
+WI:'It’s shaped like a mitten, between Lake Michigan and Lake Superior',
+WY:'It’s a near-perfect rectangle, home to Yellowstone'
+};
+let candSet=new Set(), autoZoomed=false;
+function setHint(text,bad){ const h=$('hintLine'); h.textContent=text; h.classList.toggle('bad',!!bad); h.hidden=false; }
+function clearHint(){ $('hintLine').hidden=true; candSet=new Set(); d3.selectAll('#qLayer path, #dotLayer circle').classed('cand',false); }
+function largestPoly(f){ let best=null, ba=-1; for(const poly of f.geometry.coordinates){ const g={type:'Polygon',coordinates:poly}; const a=d3.geoArea(g); if(a>ba){ba=a;best=g;} } return best||f; }
+// The answer plus the 3 nearest places not yet answered.
+function candidates(id){
+  const me=targets.find(t=>t.id===id); const c0=path.centroid(largestPoly(me));
+  const others=targets.filter(t=>t.id!==id&&!status[t.id]).map(t=>{ const c=path.centroid(largestPoly(t)); return [t.id,(c[0]-c0[0])**2+(c[1]-c0[1])**2]; })
+    .filter(x=>isFinite(x[1])).sort((a,b)=>a[1]-b[1]).slice(0,3).map(x=>x[0]);
+  return [id,...others];
+}
+function zoomTo(ids){
+  const W=wrap.clientWidth, H=wrap.clientHeight; let x0=Infinity,y0=Infinity,x1=-Infinity,y1=-Infinity;
+  ids.forEach(id=>{ const f=targets.find(t=>t.id===id); if(!f) return; const b=path.bounds(largestPoly(f)); if(!isFinite(b[0][0])) return; x0=Math.min(x0,b[0][0]); y0=Math.min(y0,b[0][1]); x1=Math.max(x1,b[1][0]); y1=Math.max(y1,b[1][1]); });
+  if(!isFinite(x0)) return;
+  const s=Math.max(1,Math.min(14,0.7/Math.max((x1-x0)/W,(y1-y0)/H,1e-6)));
+  if(s<1.3) return;
+  autoZoomed=true;
+  svg.transition().duration(650).call(zoom.transform, d3.zoomIdentity.translate(W/2-s*(x0+x1)/2, H/2-s*(y0+y1)/2).scale(s));
+}
+const kindWord=()=>quizKey==='us'?'states':'countries';
+// level 1 = where it is, 2 = a defining feature, 3 = four highlighted options. A 4th miss reveals it.
+function showHint(level){
+  const f=targets.find(t=>t.id===current); if(!f||!level) return;
+  const left=4-level, tail=' ('+left+' '+(left===1?'guess':'guesses')+' left)';
+  const lines=['It’s in '+placeOf(f)+'.'];
+  if(level>=2) lines.push((CHAR[f.id]||('Its name starts with “'+f.properties.name[0]+'”'))+'.');
+  if(level>=3){
+    candSet=new Set(candidates(f.id));
+    d3.selectAll('#qLayer path, #dotLayer circle').classed('cand', d=>candSet.has(d.f?d.f.id:d.id));
+    lines.push('It’s one of the '+candSet.size+' highlighted '+kindWord()+'.');
+    zoomTo([...candSet]);
+  }
+  setHint('Hint: '+lines.join(' ')+tail);
+}
 
 // ---- Saved progress + pausable clock ----
 let elapsed=0, runAt=0, running=false;
@@ -284,20 +613,22 @@ function start(fresh){
     queue=sv.q.slice(); status=sv.status||{}; missed=sv.missed||[]; mistakes=sv.mistakes||0; done=sv.done||0; elapsed=sv.elapsed||0; rt=sv.tries||0; resumed=true;
   } else queue = shuffle(targets.map(f=>f.id));
   $('over').hidden=true;
-  d3.selectAll('#qLayer path, #dotLayer circle').classed('s1 s2 s3 s4 sel reveal wrong',false);
+  clearHint();
+  d3.selectAll('#qLayer path, #dotLayer circle').classed('s1 s2 s3 s4 s5 cand sel reveal wrong',false);
   Object.entries(status).forEach(([id,st])=>setStatus(id,st));
   drawLabels();
   clearInterval(timer); timer=setInterval(tick,250); $('sTime').textContent=fmt(elapsed);
   runClock();
-  next(); tries=rt;
+  next(); tries=rt; if(tries) showHint(tries);
   if(resumed) toast('Picked up where you left off');
   save();
 }
 function tick(){ if(!finished) $('sTime').textContent = fmt(clock()); }
 function nameOf(id){ const f=targets.find(t=>t.id===id); return f?f.properties.name:id; }
-function next(){
+function next(keepZoom){
   if(!queue.length){ finish(); return; }
-  current = queue.shift(); tries=0; setTimeout(save,0);
+  current = queue.shift(); tries=0; setTimeout(save,0); clearHint();
+  if(autoZoomed&&!keepZoom){ autoZoomed=false; svg.transition().duration(500).call(zoom.transform,d3.zoomIdentity); }
   $('tName').textContent = nameOf(current);
   updateStats();
 }
@@ -319,13 +650,14 @@ function clickCountry(f){
     tries++; mistakes++;
     toast('That’s ' + f.properties.name);
     const e = els(f.id).classed('wrong',true); setTimeout(()=>e.classed('wrong',false),450);
-    if(tries>=3){
+    if(tries>=4){
       const id=current; missed.push(nameOf(id)); done++;
       const r = els(id).classed('reveal',true);
-      const g=game; setTimeout(()=>{ r.classed('reveal',false); if(g===game) setStatus(id,4); }, 1400);
-      status[id]=4;
-      next();
-    }
+      const g=game; setTimeout(()=>{ r.classed('reveal',false); if(g===game) setStatus(id,5); }, 1400);
+      status[id]=5;
+      next(true);
+      setHint('Missed: the flashing one is '+nameOf(id)+'. '+(CHAR[id]?CHAR[id]+'.':''), true);
+    } else showHint(tries);
     updateStats(); save();
   }
 }
@@ -352,8 +684,8 @@ function setMode(m){
   mode=m; $('modePlay').setAttribute('aria-pressed',m==='play'); $('modeStudy').setAttribute('aria-pressed',m==='study');
   document.querySelector('.stats').hidden = m==='study'; $('skipBtn').hidden = m==='study'; $('restartBtn').hidden = m==='study';
   document.querySelector('.bar').hidden = m==='study'; $('legend').hidden = m==='study';
-  if(m==='study'){ stopClock(); save(); game++; clearInterval(timer); finished=true; current=null; status={}; selected=null;
-    d3.selectAll('#qLayer path, #dotLayer circle').classed('s1 s2 s3 s4 sel reveal wrong',false); drawLabels();
+  if(m==='study'){ stopClock(); save(); game++; clearInterval(timer); finished=true; current=null; status={}; selected=null; clearHint();
+    d3.selectAll('#qLayer path, #dotLayer circle').classed('s1 s2 s3 s4 s5 cand sel reveal wrong',false); drawLabels();
     $('over').hidden=true; $('tLabel').textContent='Study mode'; $('tName').textContent='Tap any place to see its name'; }
   else { $('tLabel').textContent='Click on'; start(); }
 }
