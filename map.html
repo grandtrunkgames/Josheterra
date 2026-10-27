@@ -72,6 +72,14 @@ svg{display:block;width:100%;height:100%;touch-action:none;user-select:none;-web
 .dot.reveal,.dot.wrong{fill-opacity:.85}
 /* Islands of tiny countries get a light outline so every island stays visible as a speck. */
 .ctry.tiny{stroke:#d5dbd6;stroke-width:1.3px}
+/* Dashed outline around all the islands of a small island nation. Tapping inside it counts as tapping that country. */
+.hull{fill:#d5dbd6;fill-opacity:.07;stroke:#d5dbd6;stroke-opacity:.8;stroke-width:1.2px;stroke-dasharray:4 3;vector-effect:non-scaling-stroke;cursor:pointer}
+@media (hover:hover){.hull.q:hover{fill-opacity:.18}}
+.hull.s1,.hull.s2,.hull.s3,.hull.s4{fill-opacity:.16;stroke:#fff;stroke-opacity:1;stroke-dasharray:none}
+.hull.s5{fill-opacity:.2;stroke:var(--miss);stroke-opacity:1;stroke-dasharray:none}
+.hull.cand{fill-opacity:.25;stroke:var(--hit2)!important;stroke-dasharray:none}
+.hull.sel{fill-opacity:.25}
+.hull.reveal,.hull.wrong{fill-opacity:.5}
 .s1,.s2,.s3,.s4{fill:var(--hit1)!important}.s5{fill:var(--miss)!important}
 .cand{fill:var(--hit2)!important;stroke:#fff!important;stroke-width:1.6px!important}
 .sel{fill:var(--study)!important}
@@ -148,7 +156,7 @@ svg{display:block;width:100%;height:100%;touch-action:none;user-select:none;-web
   </div>
 
   <div class="mapwrap" id="mapwrap">
-    <svg id="map" role="img" aria-label="Map"><g id="zoomg"><g id="bgLayer"></g><g id="qLayer"></g><g id="dotLayer"></g><g id="labelLayer"></g></g></svg>
+    <svg id="map" role="img" aria-label="Map"><g id="zoomg"><g id="bgLayer"></g><g id="hullLayer"></g><g id="qLayer"></g><g id="dotLayer"></g><g id="labelLayer"></g></g></svg>
     <div class="loading" id="loading">Loading map…</div>
     <p class="hintline" id="hintLine" hidden></p>
     <div class="legend" id="legend">
@@ -253,14 +261,41 @@ function draw(){
     .attr('class', d=>'dot q '+(status[d.f.id]?'s'+status[d.f.id]:'')+(selected===d.f.id?' sel':'')+(candSet.has(d.f.id)?' cand':''))
     .attr('cx',d=>d.x).attr('cy',d=>d.y).attr('r', 7/k)
     .on('click',(e,d)=>clickCountry(d.f));
+  // Island nations: one outline per cluster of islands (a cluster split by the map edge gets two).
+  const hulls=[], hullExt={};
+  targets.forEach(f=>{
+    const polys=f.geometry.coordinates; if(polys.length<2||HULL_SKIP.has(f.id)) return;
+    let big=0; for(const poly of polys) big=Math.max(big,d3.geoArea({type:'Polygon',coordinates:poly}));
+    if(big>0.0003) return;
+    const isl=polys.map(poly=>poly[0].map(pt=>proj(pt)).filter(pt=>pt&&isFinite(pt[0]))).filter(a=>a.length);
+    if(isl.length<2) return;
+    const cs=isl.map(a=>[d3.mean(a,pt=>pt[0]),a]).sort((a,b)=>a[0]-b[0]);
+    const groups=[[cs[0]]]; for(let i=1;i<cs.length;i++){ if(cs[i][0]-cs[i-1][0]>W*0.25) groups.push([]); groups[groups.length-1].push(cs[i]); }
+    groups.forEach((g,gi)=>{
+      if(g.length<2&&groups.length===1) return;
+      let pts=g.flatMap(x=>x[1]); if(pts.length<3) pts=pts.concat(pts.map(pt=>[pt[0]+.01,pt[1]+.01]),pts.map(pt=>[pt[0]-.01,pt[1]+.01]));
+      const h=d3.polygonHull(pts); if(!h) return;
+      const ext=Math.max(d3.max(h,pt=>pt[0])-d3.min(h,pt=>pt[0]), d3.max(h,pt=>pt[1])-d3.min(h,pt=>pt[1]));
+      hulls.push({f,key:f.id+'#'+gi,h,ext}); hullExt[f.id]=Math.max(hullExt[f.id]||0,ext);
+    });
+  });
+  hulls.sort((a,b)=>b.ext-a.ext);
+  d3.select('#hullLayer').selectAll('path').data(hulls,d=>d.key).join('path')
+    .attr('class', d=>'hull q '+(status[d.f.id]?'s'+status[d.f.id]:'')+(selected===d.f.id?' sel':'')+(candSet.has(d.f.id)?' cand':''))
+    .on('click',(e,d)=>clickCountry(d.f));
+  d3.select('#dotLayer').selectAll('circle').each(d=>{ d.hx=hullExt[d.f.id]||0; });
   sizeDots();
   drawLabels();
   $('loading').hidden = true;
 }
-function sizeDots(){ d3.select('#dotLayer').selectAll('circle').attr('r', 7/k).style('display', d=>d.a*k*k>140?'none':null); d3.select('#labelLayer').selectAll('text').attr('font-size',13/k).attr('stroke-width',3/k); }
+const HULL_SKIP=new Set(['BRN','TLS','PSE','CYP']);
+const hullLine=d3.line().curve(d3.curveCatmullRomClosed.alpha(0.5));
+function hullPath(h,r){ const pts=[]; for(const pt of h) for(let a=0;a<8;a++) pts.push([pt[0]+r*Math.cos(a*Math.PI/4), pt[1]+r*Math.sin(a*Math.PI/4)]); return hullLine(d3.polygonHull(pts)); }
+function sizeDots(){ d3.select('#dotLayer').selectAll('circle').attr('r', 7/k).style('display', d=>(d.a*k*k>140||d.hx*k>26)?'none':null);
+  d3.select('#hullLayer').selectAll('path').attr('d', d=>hullPath(d.h, 7/k)); d3.select('#labelLayer').selectAll('text').attr('font-size',13/k).attr('stroke-width',3/k); }
 zoom.on('zoom', e=>{ k=e.transform.k; zg.attr('transform', e.transform); sizeDots(); });
 
-function els(id){ return d3.selectAll('#qLayer path, #dotLayer circle').filter(d=> (d.f?d.f.id:d.id)===id); }
+function els(id){ return d3.selectAll('#qLayer path, #dotLayer circle, #hullLayer path').filter(d=> (d.f?d.f.id:d.id)===id); }
 function setStatus(id, s){ status[id]=s; els(id).classed('s1',s===1).classed('s2',s===2).classed('s3',s===3).classed('s4',s===4).classed('s5',s===5); }
 
 function drawLabels(){
@@ -562,7 +597,7 @@ WY:'It’s a near-perfect rectangle, home to Yellowstone'
 };
 let candSet=new Set(), autoZoomed=false, tinyIds=new Set();
 function setHint(text,bad){ const h=$('hintLine'); h.textContent=text; h.classList.toggle('bad',!!bad); h.hidden=false; }
-function clearHint(){ $('hintLine').hidden=true; candSet=new Set(); d3.selectAll('#qLayer path, #dotLayer circle').classed('cand',false); }
+function clearHint(){ $('hintLine').hidden=true; candSet=new Set(); d3.selectAll('#qLayer path, #dotLayer circle, #hullLayer path').classed('cand',false); }
 function largestPoly(f){ let best=null, ba=-1; for(const poly of f.geometry.coordinates){ const g={type:'Polygon',coordinates:poly}; const a=d3.geoArea(g); if(a>ba){ba=a;best=g;} } return best||f; }
 // The answer plus the 3 nearest places not yet answered.
 function candidates(id){
@@ -581,16 +616,20 @@ function zoomTo(ids){
   autoZoomed=true;
   svg.transition().duration(650).call(zoom.transform, d3.zoomIdentity.translate(W/2-s*(x0+x1)/2, top+AH/2-s*(y0+y1)/2).scale(s));
 }
+
+// Where each place sits relative to a well-known country or state (worked out once from the map data).
+const REL={"IDN": "", "MYS": ", on the north side of Indonesia", "CHL": "", "BOL": ", on the southeast side of Peru", "PER": "", "ARG": "", "CYP": ", just southwest of Turkey", "IND": "", "CHN": "", "ISR": ", on the northeast side of Egypt", "PSE": ", on the northeast side of Egypt", "LBN": ", just south of Turkey", "ETH": "", "SSD": ", on the northeast side of DR Congo", "SOM": ", on the southeast side of Ethiopia", "KEN": "", "MWI": ", just southeast of DR Congo", "TZA": ", on the southwest side of Kenya", "SYR": ", on the southeast side of Turkey", "FRA": "", "SUR": ", on the north side of Brazil", "GUY": ", on the north side of Brazil", "KOR": ", just west of Japan", "PRK": ", on the east side of China", "MAR": "", "ESH": ", on the southwest side of Morocco", "CRI": ", just northwest of Colombia", "NIC": ", just southeast of Mexico", "COG": ", on the west side of DR Congo", "COD": "", "BTN": ", on the northeast side of India", "UKR": "", "BLR": ", on the northwest side of Ukraine", "NAM": ", on the northwest side of South Africa", "ZAF": "", "OMN": ", on the east side of Saudi Arabia", "UZB": ", on the southwest side of Kazakhstan", "KAZ": "", "TJK": ", on the west side of China", "LTU": ", on the northeast side of Poland", "BRA": "", "URY": ", on the south side of Brazil", "MNG": "", "RUS": "", "CZE": ", on the southwest side of Poland", "DEU": "", "EST": ", on the west side of Russia", "LVA": ", on the west side of Russia", "NOR": "", "SWE": "", "FIN": ", on the west side of Russia", "VNM": ", on the south side of China", "KHM": ", on the southeast side of Thailand", "LUX": ", on the southwest side of Germany", "ARE": ", on the east side of Saudi Arabia", "BEL": ", on the north side of France", "GEO": ", on the southwest side of Russia", "MKD": ", on the north side of Greece", "ALB": ", on the northwest side of Greece", "AZE": ", on the northwest side of Iran", "UNK": ", just north of Greece", "TUR": "", "ESP": "", "LAO": ", on the northeast side of Thailand", "KGZ": ", on the west side of China", "ARM": ", on the east side of Turkey", "DNK": ", on the north side of Germany", "LBY": ", on the west side of Egypt", "TUN": ", on the northeast side of Algeria", "ROU": ", on the southwest side of Ukraine", "HUN": ", on the west side of Ukraine", "SVK": ", on the south side of Poland", "POL": "", "IRL": ", on the west side of the UK", "GBR": "", "GRC": "", "ZMB": ", on the south side of DR Congo", "SLE": ", south of Morocco", "GIN": ", south of Morocco", "LBR": ", west of Nigeria", "CAF": ", on the north side of DR Congo", "SDN": ", on the south side of Egypt", "DJI": ", on the northeast side of Ethiopia", "ERI": ", on the north side of Ethiopia", "AUT": ", on the southeast side of Germany", "IRQ": ", on the west side of Iran", "ITA": "", "CHE": ", on the northwest side of Italy", "IRN": "", "NLD": ", on the west side of Germany", "LIE": ", just south of Germany", "CIV": ", just west of Nigeria", "SRB": ", just north of Greece", "MLI": ", on the southwest side of Algeria", "SEN": ", just south of Morocco", "NGA": "", "BEN": ", on the west side of Nigeria", "AGO": ", on the southwest side of DR Congo", "HRV": ", on the northeast side of Italy", "SVN": ", on the northeast side of Italy", "QAT": ", on the east side of Saudi Arabia", "SAU": "", "BWA": ", on the north side of South Africa", "ZWE": ", on the northeast side of South Africa", "PAK": "", "BGR": ", on the northeast side of Greece", "THA": "", "SMR": ", on the north side of Italy", "HTI": ", just southeast of Cuba", "DOM": ", just east of Cuba", "TCD": ", on the northeast side of Nigeria", "KWT": ", on the northeast side of Saudi Arabia", "SLV": ", just southeast of Mexico", "GTM": ", on the southeast side of Mexico", "TLS": ", on the southeast side of Indonesia", "BRN": ", just north of Indonesia", "MCO": ", on the southeast side of France", "DZA": "", "MOZ": ", on the northeast side of South Africa", "SWZ": ", on the northeast side of South Africa", "BDI": ", on the east side of DR Congo", "RWA": ", on the east side of DR Congo", "MMR": ", on the northwest side of Thailand", "BGD": ", on the east side of India", "AND": ", on the south side of France", "AFG": ", on the northwest side of Pakistan", "MNE": ", just east of Italy", "BIH": ", just east of Italy", "UGA": ", on the northeast side of DR Congo", "CUB": "", "HND": ", just southeast of Mexico", "ECU": ", on the northwest side of Peru", "COL": "", "PRY": ", on the south side of Brazil", "PRT": ", on the west side of Spain", "MDA": ", on the southwest side of Ukraine", "TKM": ", on the northeast side of Iran", "JOR": ", on the northwest side of Saudi Arabia", "NPL": ", on the southwest side of China", "LSO": ", just east of South Africa", "CMR": ", on the southeast side of Nigeria", "GAB": ", just west of DR Congo", "NER": ", on the southeast side of Algeria", "BFA": ", just west of Nigeria", "TGO": ", just west of Nigeria", "GHA": ", just west of Nigeria", "GNB": ", south of Morocco", "USA": "", "CAN": "", "MEX": "", "BLZ": ", on the southeast side of Mexico", "PAN": ", on the northwest side of Colombia", "VEN": "", "PNG": "", "EGY": "", "YEM": ", on the south side of Saudi Arabia", "MRT": ", on the southwest side of Algeria", "GNQ": ", just south of Nigeria", "GMB": ", south of Morocco", "VAT": ", on the south side of Italy", "AUS": "", "FJI": ", north of New Zealand", "NZL": "", "MDG": "", "PHL": "", "LKA": ", just south of India", "BHS": ", just northeast of Cuba", "TWN": ", on the southeast side of China", "JPN": "", "ISL": ", northwest of the UK", "SYC": ", just north of Madagascar", "KIR": ", east of Papua New Guinea", "MHL": ", northeast of Papua New Guinea", "TTO": ", on the northeast side of Venezuela", "GRD": ", just northeast of Venezuela", "VCT": ", just northeast of Venezuela", "BRB": ", just northeast of Venezuela", "LCA": ", just northeast of Venezuela", "DMA": ", just northeast of Venezuela", "ATG": ", northeast of Venezuela", "KNA": ", north of Venezuela", "JAM": ", just southeast of Cuba", "MUS": ", east of Madagascar", "COM": ", just north of Madagascar", "STP": ", just south of Nigeria", "CPV": ", southwest of Morocco", "MLT": ", just south of Italy", "SGP": ", just west of Indonesia", "TON": ", northeast of New Zealand", "WSM": ", far northeast of New Zealand", "SLB": ", just east of Papua New Guinea", "TUV": ", far east of Papua New Guinea", "MDV": ", just south of India", "NRU": ", east of Papua New Guinea", "FSM": ", northeast of Papua New Guinea", "VUT": ", north of New Zealand", "PLW": ", just east of Indonesia", "BHR": ", on the east side of Saudi Arabia", "AK": ", northwest of Washington", "AL": ", on the west side of Georgia", "AR": ", on the northeast side of Texas", "AZ": "", "CA": "", "CO": "", "CT": ", on the southeast side of New York", "DE": ", on the southeast side of Pennsylvania", "FL": "", "GA": "", "HI": ", far southwest of California", "IA": ", on the northwest side of Illinois", "ID": ", on the southeast side of Washington", "IL": "", "IN": ", on the east side of Illinois", "KS": ", on the east side of Colorado", "KY": ", on the southeast side of Illinois", "LA": ", on the east side of Texas", "MA": ", on the east side of New York", "MD": ", on the southeast side of Pennsylvania", "ME": ", just northeast of New York", "MI": "", "MN": "", "MO": ", on the southwest side of Illinois", "MS": ", just northwest of Florida", "MT": ", just east of Washington", "NC": ", on the northeast side of Georgia", "ND": ", on the west side of Minnesota", "NE": ", on the northeast side of Colorado", "NH": ", just east of New York", "NJ": ", on the east side of Pennsylvania", "NM": ", on the northwest side of Texas", "NV": ", on the northeast side of California", "NY": "", "OH": ", on the southeast side of Michigan", "OK": ", on the north side of Texas", "OR": ", on the south side of Washington", "PA": "", "RI": ", just southeast of New York", "SC": ", on the northeast side of Georgia", "SD": ", on the southwest side of Minnesota", "TN": ", on the northwest side of Georgia", "TX": "", "UT": ", on the west side of Colorado", "VA": ", just south of Pennsylvania", "VT": ", on the northeast side of New York", "WA": "", "WI": ", on the southeast side of Minnesota", "WV": ", on the southwest side of Pennsylvania", "WY": ", just north of Colorado"};
+const relPhrase=f=>REL[f.id]||'';
 const kindWord=()=>quizKey==='us'?'states':'countries';
 // level 1 = where it is, 2 = a defining feature, 3 = four highlighted options. A 4th miss reveals it.
 function showHint(level){
   const f=targets.find(t=>t.id===current); if(!f||!level) return;
   const left=4-level, tail=' ('+left+' '+(left===1?'guess':'guesses')+' left)';
-  const lines=['It’s in '+placeOf(f)+'.'];
+  const lines=['It’s in '+placeOf(f)+relPhrase(f)+'.'];
   if(level>=2) lines.push((CHAR[f.id]||('Its name starts with “'+f.properties.name[0]+'”'))+'.');
   if(level>=3){
     candSet=new Set(candidates(f.id));
-    d3.selectAll('#qLayer path, #dotLayer circle').classed('cand', d=>candSet.has(d.f?d.f.id:d.id));
+    d3.selectAll('#qLayer path, #dotLayer circle, #hullLayer path').classed('cand', d=>candSet.has(d.f?d.f.id:d.id));
     lines.push('It’s one of the '+candSet.size+' highlighted '+kindWord()+'.');
   }
   setHint('Hint: '+lines.join(' ')+tail);
@@ -622,7 +661,7 @@ function start(fresh){
   } else queue = shuffle(targets.map(f=>f.id));
   $('over').hidden=true;
   clearHint();
-  d3.selectAll('#qLayer path, #dotLayer circle').classed('s1 s2 s3 s4 s5 cand sel reveal wrong',false);
+  d3.selectAll('#qLayer path, #dotLayer circle, #hullLayer path').classed('s1 s2 s3 s4 s5 cand sel reveal wrong',false);
   Object.entries(status).forEach(([id,st])=>setStatus(id,st));
   drawLabels();
   clearInterval(timer); timer=setInterval(tick,250); $('sTime').textContent=fmt(elapsed);
@@ -649,7 +688,7 @@ function updateStats(){
 }
 function clickCountry(f){
   if(mode==='study' || finished){ selected = selected===f.id?null:f.id;
-    d3.selectAll('#qLayer path, #dotLayer circle').classed('sel', d=>(d.f?d.f.id:d.id)===selected);
+    d3.selectAll('#qLayer path, #dotLayer circle, #hullLayer path').classed('sel', d=>(d.f?d.f.id:d.id)===selected);
     drawLabels(); return; }
   if(!current || status[f.id]) { if(status[f.id]) toast(f.properties.name); return; }
   if(f.id===current){
@@ -693,7 +732,7 @@ function setMode(m){
   document.querySelector('.stats').hidden = m==='study'; $('skipBtn').hidden = m==='study'; $('restartBtn').hidden = m==='study';
   document.querySelector('.bar').hidden = m==='study'; $('legend').hidden = m==='study';
   if(m==='study'){ stopClock(); save(); game++; clearInterval(timer); finished=true; current=null; status={}; selected=null; clearHint();
-    d3.selectAll('#qLayer path, #dotLayer circle').classed('s1 s2 s3 s4 s5 cand sel reveal wrong',false); drawLabels();
+    d3.selectAll('#qLayer path, #dotLayer circle, #hullLayer path').classed('s1 s2 s3 s4 s5 cand sel reveal wrong',false); drawLabels();
     $('over').hidden=true; $('tLabel').textContent='Study mode'; $('tName').textContent='Tap any place to see its name'; }
   else { $('tLabel').textContent='Click on'; start(); }
 }
